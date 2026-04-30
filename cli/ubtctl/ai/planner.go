@@ -59,9 +59,13 @@ func Run(ctx context.Context, p Plan) error {
 	}
 	llm := anthropic.NewClient(option.WithAPIKey(apiKey))
 
-	tools, err := BuildTools(p.Daemon, p.Mode)
+	specs, err := BuildSpecs(p.Daemon, p.Mode)
 	if err != nil {
-		return fmt.Errorf("build tools: %w", err)
+		return fmt.Errorf("build specs: %w", err)
+	}
+	beta, err := AsBetaTools(specs)
+	if err != nil {
+		return fmt.Errorf("adapt tools: %w", err)
 	}
 
 	system := []anthropic.BetaTextBlockParam{{
@@ -72,7 +76,7 @@ func Run(ctx context.Context, p Plan) error {
 		CacheControl: anthropic.NewBetaCacheControlEphemeralParam(),
 	}}
 
-	runner := llm.Beta.Messages.NewToolRunnerStreaming(tools, anthropic.BetaToolRunnerParams{
+	runner := llm.Beta.Messages.NewToolRunnerStreaming(beta, anthropic.BetaToolRunnerParams{
 		BetaMessageNewParams: anthropic.BetaMessageNewParams{
 			Model:     anthropic.Model(p.Model),
 			MaxTokens: p.MaxTokens,

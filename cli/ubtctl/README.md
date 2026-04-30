@@ -47,6 +47,7 @@ UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl send --address AA:BB:CC:DD:EE:01 --data 
 | `discover`      | Stream device scan results until timeout             |
 | `send`          | Push a payload (`--data`, `--file`, or stdin)        |
 | `ask`           | Natural-language goal → AI planner → daemon RPCs     |
+| `mcp`           | Serve the tool registry over MCP on stdio            |
 
 Run `ubtctl <command> -h` for per-command flags.
 
@@ -70,6 +71,43 @@ The system prompt + tool list are kept stable across runs and marked with
 `cache_control: ephemeral`, so subsequent invocations read the cached prefix
 instead of paying for it.
 
+## MCP server (`ubtctl mcp`)
+
+Exposes the same tool registry the in-process AI planner uses, but over the
+[Model Context Protocol](https://modelcontextprotocol.io/) on stdio. Any
+MCP-aware client (Claude Desktop, Cursor, Zed, custom agents) can drive
+ubtd by launching the binary directly.
+
+Example client config:
+
+```json
+{
+  "mcpServers": {
+    "ubtctl": {
+      "command": "/usr/local/bin/ubtctl",
+      "args": ["mcp", "--socket", "/tmp/ubtd.sock"],
+      "env": {}
+    }
+  }
+}
+```
+
+The server speaks JSON-RPC 2.0 with newline-delimited frames, supports
+`initialize`, `ping`, `tools/list`, `tools/call`, and exposes the same five
+tools (`ping_daemon`, `get_status`, `get_capabilities`, `discover_devices`,
+`send_payload`) with auto-derived JSON Schemas. Logs go to stderr only —
+stdout is reserved for the MCP stream.
+
+Quick smoke test from the shell:
+
+```bash
+{
+  echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}'
+  echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+  echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_status","arguments":{}}}'
+} | ubtctl mcp --socket /tmp/ubtd.sock
+```
+
 ## Configuration
 
 | Variable             | Default                                    | Notes                                      |
@@ -80,6 +118,6 @@ instead of paying for it.
 
 ## Status
 
-Phase 4 of the plan in the repo root README: typed CLI plus AI planner
-working end-to-end against the stub driver. Native Bluetooth drivers ride on
-the same wire format and ship next.
+Phase 5: typed CLI + AI planner + Linux RFCOMM driver + MCP server, all
+sharing the same tool registry. Adding a daemon RPC mechanically extends
+the typed CLI, the AI planner's tool set, and the MCP surface in lockstep.
