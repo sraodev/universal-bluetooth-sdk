@@ -1,0 +1,10 @@
+bin/
+*.sock
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/

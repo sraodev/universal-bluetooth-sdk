@@ -1,0 +1,87 @@
+// Universal Bluetooth control-plane protocol, version 1.
+//
+// Status: source of truth for *future* gRPC stubs. The current Go daemon
+// (`ubtd`) speaks the wire format described in `framing.md`, which is a
+// length-prefixed JSON envelope semantically equivalent to the messages
+// declared here. Migrating to gRPC is a transport swap, not a redesign.
+//
+// All names below match the JSON field names used on the wire today.
+
+syntax = "proto3";
+
+package universalbt.v1;
+
+// ---------------------------------------------------------------------------
+// Common types
+// ---------------------------------------------------------------------------
+
+message Device {
+  string address    = 1; // MAC or BLE identifier
+  string name       = 2;
+  string transport  = 3; // "rfcomm" | "ble" | ...
+  int32  rssi       = 4;
+  map<string, string> attributes = 5;
+}
+
+message Capability {
+  string transport = 1;
+  bool   discover  = 2;
+  bool   pair      = 3;
+  bool   stream    = 4;
+  int32  max_mtu   = 5;
+}
+
+message Error {
+  string code    = 1; // stable machine-readable code
+  string message = 2;
+  map<string, string> details = 3;
+}
+
+// ---------------------------------------------------------------------------
+// RPC surface
+// ---------------------------------------------------------------------------
+
+service Control {
+  rpc Ping        (PingRequest)        returns (PingResponse);
+  rpc Version     (VersionRequest)     returns (VersionResponse);
+  rpc Capabilities(CapabilitiesRequest) returns (CapabilitiesResponse);
+  rpc Discover    (DiscoverRequest)    returns (stream Device);
+  rpc Send        (SendRequest)        returns (SendResponse);
+  rpc Status      (StatusRequest)      returns (StatusResponse);
+}
+
+message PingRequest  {}
+message PingResponse { string pong = 1; int64 server_time_unix_ms = 2; }
+
+message VersionRequest  {}
+message VersionResponse {
+  string daemon_version   = 1;
+  string protocol_version = 2;
+  string commit           = 3;
+}
+
+message CapabilitiesRequest  {}
+message CapabilitiesResponse { repeated Capability capabilities = 1; }
+
+message DiscoverRequest {
+  string transport       = 1; // empty = all available
+  int32  timeout_seconds = 2;
+}
+
+message SendRequest {
+  string address   = 1;
+  string transport = 2;
+  bytes  payload   = 3;
+  int32  uuid_port = 4; // RFCOMM channel / GATT handle
+}
+message SendResponse {
+  int64 bytes_sent     = 1;
+  int64 latency_micros = 2;
+}
+
+message StatusRequest  {}
+message StatusResponse {
+  string state            = 1; // "ready" | "degraded" | "starting"
+  int32  active_sessions  = 2;
+  repeated string drivers = 3;
+}
