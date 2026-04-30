@@ -1,11 +1,46 @@
-# Sensor Stream Example (placeholder)
+# Sensor-stream example (planned)
 
-Concept: stream structured sensor data (temperature, humidity, etc.) from an IoT
-device to a gateway.
+Stream structured telemetry (temperature, humidity, IMU readings) from
+an embedded device to a gateway over RFCOMM, into a time-series sink.
+Demonstrates the **continuous** flavour of bidirectional sessions —
+the device writes forever, the gateway listens forever.
 
-Implementation pointers:
+## Where it fits
 
-- Extend the client data source to read from mock sensors or CSV feeds.
-- Update the server sink to push readings into a time-series database.
-- Document schema in `common/message-schema/`.
+```
+sensor (Pi/ESP32)              gateway
+  ubtctl sensor stream    ────► ubtd (linuxrfcomm)  ──► storage adapter
+                                      │                  (e.g. InfluxDB,
+                                      │                   timescaledb,
+                                      │                   sqlite, S3 parquet)
+                                      └─ optional: AI summariser via ubtctl ask
+```
 
+The storage step reuses the `Storage` interface that already exists in
+[`sdk/python/bluetooth_service/storage.py`](../../sdk/python/bluetooth_service/storage.py)
+(or its Go equivalent under [`sdk/go/pkg/`](../../sdk/go/pkg/) when that
+ships).
+
+## Anticipated record shape
+
+(Lands in `common/message-schema/json/sensor-record.schema.json`.)
+
+```jsonc
+{
+  "device_id": "esp32-livingroom",
+  "timestamp_unix_ms": 1719876543210,
+  "metric": "temperature_c",
+  "value": 21.3,
+  "tags": { "location": "livingroom" }
+}
+```
+
+## Required upstream pieces
+
+- Phase 2 of the [roadmap](../../README.md#roadmap) — `Listen` / `Reply`.
+- Record schema in `common/message-schema/`.
+- A small `ubtctl sensor` subcommand on the device side.
+- A storage-adapter selection mechanism on the gateway (env var or
+  flag pointing at a sink URL).
+
+Status: **planned**.

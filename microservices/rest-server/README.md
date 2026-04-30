@@ -1,13 +1,38 @@
-# REST Server (placeholder)
+# REST server (planned)
 
-Goal: expose Bluetooth server/client capabilities via RESTful endpoints for easy
-integration with web/mobile apps.
+Sibling of [`microservices/grpc-server`](../grpc-server) — same role,
+different transport. Exposes `ubtd` to web and mobile clients that
+prefer plain HTTP/JSON over gRPC.
 
-Roadmap ideas:
+## Where it fits
 
-1. Align resource models with `common/message-schema/`.
-2. Reuse the gRPC service definitions via gRPC-Gateway or implement a native REST
-   controller that talks to the SDK.
-3. Document authentication/authorization requirements for remote control of BT
-   devices.
+```
+browser / mobile ── HTTPS ──►  microservices/rest-server  ── UDS ──►  ubtd
+                                  (this directory)
+```
 
+Yet another **inbound adapter**. The same daemon that the typed CLI, the
+AI planner, and the MCP server talk to.
+
+## When this ships
+
+After the gRPC server, since two of the three implementation paths reuse
+gRPC artefacts:
+
+| Path | Effort | Notes |
+|---|---|---|
+| Hand-written REST controller | Lowest | Calls back into `ubtd` over UDS using the same client the CLI uses. |
+| `grpc-gateway` in front of `microservices/grpc-server` | Medium | Auto-generated REST routes from `common/protocol/v1.proto`. |
+| OpenAPI document generated from `v1.proto` + a Go HTTP handler | Medium | Provides client codegen for web/mobile out of the box. |
+
+## Authentication / policy
+
+Owned by this service, not the daemon. Recommended baseline:
+
+- TLS on the public port; mTLS optional.
+- Bearer-token auth (RBAC mapped to per-tool policy).
+- Reuse the same `mutating: true` flag the [tool registry](../../cli/ubtctl/tools/) carries today as the gate for write operations.
+- Emit access logs to whatever the deploy environment captures (stdout JSON via slog is the obvious default).
+
+Status: **planned**. The hex architecture means this can ship without
+touching the daemon at all.
