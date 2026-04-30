@@ -9,13 +9,15 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/sockaddr"
 )
 
+func defaultSocket() string { return sockaddr.Default() }
+
 type baseFlags struct {
 	socket  string
 	timeout time.Duration
 }
 
 func bindBase(fs *flag.FlagSet, b *baseFlags) {
-	fs.StringVar(&b.socket, "socket", sockaddr.Default(), "ubtd socket path")
+	fs.StringVar(&b.socket, "socket", defaultSocket(), "ubtd socket path")
 	fs.DurationVar(&b.timeout, "timeout", 10*time.Second, "request timeout")
 }
 

@@ -22,7 +22,7 @@ func (versionCmd) Run(args []string, info RootInfo) error {
 		return err
 	}
 
-	fmt.Printf("ubtctl   %s (commit %s)\n", info.CLIVersion, info.Commit)
+	fmt.Printf("ubtctl   %s\n", info.CLIVersion)
 	fmt.Printf("protocol %s (wire v1)\n", protocol.Version)
 	if *clientOnly {
 		return nil
@@ -44,7 +44,7 @@ func (versionCmd) Run(args []string, info RootInfo) error {
 	if err := client.Decode(res, &v); err != nil {
 		return err
 	}
-	fmt.Printf("ubtd     %s (commit %s, protocol %s)\n", v.DaemonVersion, v.Commit, v.ProtocolVersion)
+	fmt.Printf("ubtd     %s (protocol %s)\n", v.DaemonVersion, v.ProtocolVersion)
 	return nil
 }
 

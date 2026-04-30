@@ -76,7 +76,6 @@ type PingResult struct {
 type VersionResult struct {
 	DaemonVersion   string `json:"daemon_version"`
 	ProtocolVersion string `json:"protocol_version"`
-	Commit          string `json:"commit"`
 }
 
 type CapabilitiesResult struct {

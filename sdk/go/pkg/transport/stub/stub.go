@@ -6,7 +6,6 @@ package stub
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/protocol"
 )
@@ -42,12 +41,6 @@ func (d *Driver) Discover(ctx context.Context, _ protocol.DiscoverParams, out ch
 		case <-ctx.Done():
 			return ctx.Err()
 		case out <- dev:
-		}
-		// Simulate scan latency without making tests slow.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(50 * time.Millisecond):
 		}
 	}
 	return nil

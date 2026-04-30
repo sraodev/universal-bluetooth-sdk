@@ -13,7 +13,6 @@ import (
 
 type RootInfo struct {
 	CLIVersion string
-	Commit     string
 }
 
 type Command interface {

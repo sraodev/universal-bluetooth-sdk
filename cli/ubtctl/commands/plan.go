@@ -112,10 +112,7 @@ func planRun(args []string) error {
 	}
 	defer c.Close()
 
-	registry, err := ai.BuildSpecs(c, ai.ExecModeNormal)
-	if err != nil {
-		return err
-	}
+	registry := ai.BuildSpecs(c, false)
 	return ai.Replay(context.Background(), p, registry, ai.ReplayOptions{
 		AllowMutating: *yes,
 		DryRun:        *dryRun,

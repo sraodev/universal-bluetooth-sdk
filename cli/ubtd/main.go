@@ -24,11 +24,8 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/transport/stub"
 )
 
-// Set at link time: -ldflags "-X main.daemonVersion=... -X main.commit=..."
-var (
-	daemonVersion = "0.1.0-dev"
-	commit        = "unknown"
-)
+// daemonVersion can be overridden at link time via -ldflags "-X main.daemonVersion=...".
+var daemonVersion = "0.1.0-dev"
 
 func main() {
 	socket := flag.String("socket", sockaddr.Default(), "Unix domain socket path")
@@ -76,7 +73,7 @@ func main() {
 		"drivers", registry.Names(),
 	)
 
-	srv := server.New(log, registry, daemonVersion, commit)
+	srv := server.New(log, registry, daemonVersion)
 	if err := srv.Serve(ctx, ln); err != nil {
 		log.Error("serve", "err", err)
 		os.Exit(1)

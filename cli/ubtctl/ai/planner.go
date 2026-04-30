@@ -15,33 +15,25 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
 )
 
-// DefaultModel is Claude Opus 4.7 — most capable model for agentic planning.
-// The SDK predates the constant for 4.7 but accepts the bare model ID.
+// DefaultModel is Claude Opus 4.7. SDK predates the constant for 4.7
+// but accepts the bare model ID.
 const DefaultModel = "claude-opus-4-7"
 
-// RunConfig configures one planner run. Renamed from Plan to avoid colliding
-// with the on-disk Plan record produced when SavePath is set.
+// RunConfig configures one planner run.
 type RunConfig struct {
-	Goal       string         // user's natural-language request
-	Model      string         // empty → DefaultModel
+	Goal       string
+	Model      string // empty → DefaultModel
 	MaxTokens  int64
-	Mode       ExecMode
-	SocketPath string         // surfaced in the system prompt for the model
+	DryRun     bool
+	SocketPath string
 	Daemon     *client.Client
-	Out        io.Writer      // where final text + per-step notices go
-
-	// SavePath, if non-empty, captures every tool call into a Plan and
-	// writes it to disk after the run completes. Use ubtctl plan run
-	// to replay it later without going back to the LLM.
+	Out        io.Writer
+	// SavePath, if non-empty, captures every tool call into a Plan
+	// and writes it to disk after the run completes.
 	SavePath string
 }
 
 // Run executes the plan against Claude with the daemon-backed tool set.
-//
-// The runner streams tokens as they arrive so the user sees progress on
-// long planning steps. We rely on the SDK's BetaToolRunnerStreaming to
-// handle the agentic loop (call → tool result → call → …) and only step
-// in to surface text deltas to the user.
 func Run(ctx context.Context, p RunConfig) error {
 	if p.Goal == "" {
 		return errors.New("plan: empty goal")
@@ -56,7 +48,7 @@ func Run(ctx context.Context, p RunConfig) error {
 		p.Model = DefaultModel
 	}
 	if p.MaxTokens == 0 {
-		// Generous ceiling — adaptive thinking + tool calls need headroom on Opus 4.7.
+		// Adaptive thinking + tool calls need headroom on Opus 4.7.
 		p.MaxTokens = 16000
 	}
 
@@ -66,10 +58,7 @@ func Run(ctx context.Context, p RunConfig) error {
 	}
 	llm := anthropic.NewClient(option.WithAPIKey(apiKey))
 
-	specs, err := BuildSpecs(p.Daemon, p.Mode)
-	if err != nil {
-		return fmt.Errorf("build specs: %w", err)
-	}
+	specs := BuildSpecs(p.Daemon, p.DryRun)
 	var rec *recorder
 	if p.SavePath != "" {
 		rec = &recorder{}
@@ -81,10 +70,10 @@ func Run(ctx context.Context, p RunConfig) error {
 	}
 
 	system := []anthropic.BetaTextBlockParam{{
-		Text:         SystemPrompt(p.SocketPath, p.Mode),
-		// Cache the system prompt + tool list — both are stable per binary,
-		// so every subsequent `ubtctl ask` invocation reads the prefix
-		// instead of paying for it. See shared/prompt-caching.md.
+		Text: SystemPrompt(p.SocketPath, p.DryRun),
+		// Cache the system prompt + tool list — both are stable per
+		// binary, so subsequent invocations read the prefix instead
+		// of paying for it. See shared/prompt-caching.md.
 		CacheControl: anthropic.NewBetaCacheControlEphemeralParam(),
 	}}
 
@@ -103,10 +92,9 @@ func Run(ctx context.Context, p RunConfig) error {
 		MaxIterations: 8,
 	})
 
-	// AllStreaming yields one stream per agentic turn. We render only text
-	// deltas — earlier turns are tool-use orchestration the runner handles
-	// for us. Resetting `final` per turn keeps the assistant's last reply
-	// (the one that does NOT trigger another tool call) as the output.
+	// AllStreaming yields one stream per agentic turn. Resetting `final`
+	// per turn keeps the assistant's last reply (the one that does NOT
+	// trigger another tool call) as the rendered output.
 	final := strings.Builder{}
 	for events, err := range runner.AllStreaming(ctx) {
 		if err != nil {
@@ -139,13 +127,16 @@ func Run(ctx context.Context, p RunConfig) error {
 	}
 
 	if rec != nil {
+		mode := "execute"
+		if p.DryRun {
+			mode = "dry-run"
+		}
 		plan := &Plan{
-			FormatVersion: PlanFormatVersion,
-			Goal:          p.Goal,
-			Mode:          p.Mode.String(),
-			Model:         p.Model,
-			CreatedAt:     time.Now().UTC(),
-			Steps:         rec.snapshot(),
+			Goal:      p.Goal,
+			Mode:      mode,
+			Model:     p.Model,
+			CreatedAt: time.Now().UTC(),
+			Steps:     rec.steps,
 		}
 		if err := SavePlan(p.SavePath, plan); err != nil {
 			return fmt.Errorf("save plan: %w", err)
