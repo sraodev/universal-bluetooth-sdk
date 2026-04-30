@@ -47,26 +47,45 @@ class ClientSocketManager:
         if not self._service_info:
             raise BluetoothServerError("Service discovery must run before connect")
 
-        try:
-            self._socket = BluetoothSocket(RFCOMM)
-            if self._settings.connect_timeout is not None:
-                self._socket.settimeout(self._settings.connect_timeout)
-            endpoint = (self._service_info["host"], self._service_info["port"])
-            logger.info("Connecting to %s:%s", *endpoint)
-            self._socket.connect(endpoint)
-            logger.info("Connected to %s", self._service_info["name"])
-        except (BluetoothError, OSError) as exc:
-            if self._socket is not None:
-                try:
-                    self._socket.close()
-                except BluetoothError as close_exc:
-                    logger.warning("Failed to close socket after connect error: %s", close_exc)
-                finally:
-                    self._socket = None
-            raise BluetoothServerError("Unable to connect to Bluetooth service", cause=exc)
-        finally:
-            if self._socket is not None:
+        endpoint = (self._service_info["host"], self._service_info["port"])
+        retries = max(1, self._settings.connect_retries)
+        last_exc: Optional[BaseException] = None
+
+        for attempt in range(1, retries + 1):
+            try:
+                self._socket = BluetoothSocket(RFCOMM)
+                if self._settings.connect_timeout is not None:
+                    self._socket.settimeout(self._settings.connect_timeout)
+                logger.info(
+                    "Connecting to %s:%s (attempt %s/%s)",
+                    *endpoint,
+                    attempt,
+                    retries,
+                )
+                self._socket.connect(endpoint)
+                logger.info("Connected to %s", self._service_info["name"])
                 self._socket.settimeout(None)
+                return
+            except (BluetoothError, OSError) as exc:
+                last_exc = exc
+                logger.warning(
+                    "Connect attempt %s/%s to %s:%s failed: %s",
+                    attempt,
+                    retries,
+                    *endpoint,
+                    exc,
+                )
+                if self._socket is not None:
+                    try:
+                        self._socket.close()
+                    except BluetoothError as close_exc:
+                        logger.warning("Failed to close socket after connect error: %s", close_exc)
+                    finally:
+                        self._socket = None
+                if attempt < retries:
+                    time.sleep(self._settings.connect_backoff_seconds)
+
+        raise BluetoothServerError("Unable to connect to Bluetooth service", cause=last_exc)
 
     def send(self, payload: bytes) -> None:
         if not self._socket:

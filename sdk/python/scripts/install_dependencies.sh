@@ -20,7 +20,11 @@ apt-get install -y \
   blueman
 
 python3 -m pip install --upgrade pip
-python3 -m pip install pybluez pytest
+# pybluez on PyPI hasn't been updated in years and fails to build on
+# modern Python (3.10+). Install from the GitHub source instead — this
+# is the workaround maintained by the pybluez project itself. (PR #1.)
+python3 -m pip install pytest
+python3 -m pip install git+https://github.com/pybluez/pybluez.git
 
 echo "Dependencies installed. You can now run run_server.py and run_client.py"
 

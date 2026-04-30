@@ -16,6 +16,10 @@ class ClientSettings:
     buffer_size: int = 1024
     discovery_retries: int = 3
     discovery_backoff_seconds: float = 0.5
+    # Bluetooth connect() is flaky in practice — retry the connect step
+    # with a short backoff before giving up. (Adapted from PR #1.)
+    connect_retries: int = 5
+    connect_backoff_seconds: float = 1.0
     resend_empty_message: str = "EmptyBufferResend"
     resend_corrupt_message: str = "CorruptedBufferResend"
     delimiter_missing_message: str = "DelimiterMissingBufferResend"

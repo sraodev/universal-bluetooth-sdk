@@ -21,6 +21,14 @@ python3 run_client.py      # sender
 
 Run from within `sdk/python` or adjust your `PYTHONPATH` if launching elsewhere.
 
+> **PyBluez install note.** PyPI's `pybluez` package hasn't been updated
+> in years and no longer builds on Python 3.10+. Install from the GitHub
+> source instead (the helper script does this for you):
+>
+> ```bash
+> sudo python3 -m pip install git+https://github.com/pybluez/pybluez.git
+> ```
+
 ## Tests
 
 ```bash
@@ -32,7 +40,7 @@ pytest tests/
 
 - Update `bluetooth_service/config.py` (`ServerSettings`) for server behavior.
 - Update `bluetooth_service/client_config.py` (`ClientSettings`) for discovery,
-  retries, and payload source.
+  retries (both `discovery_retries` and `connect_retries`), and payload source.
 - Swap serializers/sinks/sources by injecting your own implementations when
   constructing `BluetoothServer` / `BluetoothClient`.
 
