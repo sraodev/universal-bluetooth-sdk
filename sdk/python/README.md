@@ -1,15 +1,31 @@
 # Python SDK
 
-This folder contains the production-ready Python implementation of the Universal
-Bluetooth SDK. Highlights:
+The original RFCOMM implementation that gave the project its name, kept
+as the **reference SDK** in the new architecture:
 
-- `bluetooth_service/`: reusable package with server/client orchestration,
-  serializers, storage adapters, and socket facades.
-- `run_server.py`, `run_client.py`: batteries-included entry points that consume
-  the SDK.
-- `scripts/install_dependencies.sh`: helper to install PyBluez and system
-  requirements on Debian/Ubuntu hosts.
-- `tests/`: pytest suite with transport stubs to validate protocol behavior.
+- It's the canonical place to look up "what should an RFCOMM client/server
+  *do*?" while we port behaviour to the Go daemon.
+- It's a working escape hatch on hosts where a native Go driver isn't
+  ready yet — the Go daemon could shell out to a Python SDK process to
+  exercise PyBluez paths it doesn't natively support.
+- Its tests double as protocol-conformance specs: any new Go driver that
+  claims to implement RFCOMM should pass equivalent cases.
+
+The new control plane (`ubtd`) does **not** depend on this SDK at
+runtime; it lives in its own process and only talks to drivers that
+implement the [`transport.Driver`](../go/pkg/transport/driver.go) Go
+interface. See [`/README.md`](../../README.md) for the full layered
+picture.
+
+## Layout
+
+- `bluetooth_service/` — reusable package: server/client orchestration,
+  serializers, storage adapters, socket facades, structured exceptions.
+- `run_server.py`, `run_client.py` — batteries-included entry points.
+- `scripts/install_dependencies.sh` — installs BlueZ and PyBluez (the
+  latter from the GitHub source, since the PyPI build has been broken
+  on Python 3.10+ for years).
+- `tests/` — pytest suite with transport stubs.
 
 ## Quick start
 

@@ -1,16 +1,43 @@
 # ubtctl + ubtd
 
-`ubtctl` is the Universal Bluetooth CLI; `ubtd` is the long-lived control-plane
-daemon that owns every Bluetooth session. The CLI never touches the radio
-directly — it speaks the wire protocol in
-[`common/protocol/framing.md`](../../common/protocol/framing.md) to the daemon.
+This directory ships **two binaries** that share one architecture:
+
+- **`ubtd`** — the long-lived control-plane daemon. The only process that
+  touches the radio. Loads exactly one transport driver at startup
+  (`stub` for hardware-free dev, `linuxrfcomm` on Linux with BlueZ).
+- **`ubtctl`** — the Universal Bluetooth CLI. Five inbound adapters in
+  one binary: typed verbs, AI planner (`ask`), MCP server (`mcp`),
+  plan record/replay (`plan`), and the daemon client they share.
+
+Neither binary contains hardware-specific code; they speak the
+[wire protocol](../../common/protocol/framing.md) to each other and let the
+loaded driver do the radio work.
 
 ```
-ubtctl ──UDS──> ubtd ──port──> TransportDriver ──> radio
+ubtctl  (typed CLI / ask / mcp / plan)
+   │
+   ▼     length-prefixed JSON over UDS
+ ubtd
+   │
+   ▼     transport.Driver  (+ Listener, planned)
+ stub │ linuxrfcomm │ corebluetooth (TODO) │ winrt (TODO)
 ```
 
-The same wire surface is what the AI planner targets, so adding a verb here
-extends the AI tool registry automatically.
+The package layout under `cli/ubtctl/` mirrors this:
+
+| Sub-package | Role |
+|---|---|
+| `client/` | Daemon client (length-prefixed JSON codec, request/streaming helpers). Used by every other sub-package. |
+| `commands/` | Typed verb registry. Each command parses its flags then calls into `client/`. Adding a verb here registers it for the root command automatically. |
+| `tools/` | **Neutral tool registry.** Specs declared once via reflection-derived JSON Schema, consumed by both `ai/` and `mcp/`. The `Mutating` flag gates write operations during plan replay. |
+| `ai/` | Claude Opus 4.7 planner: builds Specs, adapts them to `anthropic.BetaTool`, runs the streaming agentic loop, captures the trace into a Plan. |
+| `mcp/` | JSON-RPC 2.0 MCP server over stdio: same Specs from `tools/`, exposed as `tools/list` + `tools/call`. |
+
+Adding a daemon RPC mechanically extends every front-end: declare the
+spec in `tools/`, dispatch it in `cli/ubtd/server/`, and the typed
+CLI, AI planner, MCP server, and plan replay all see it at the same
+time. That is the architectural promise the package layout is designed
+to keep.
 
 ## Build
 
