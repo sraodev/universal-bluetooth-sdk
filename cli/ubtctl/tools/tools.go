@@ -40,12 +40,23 @@ type Spec struct {
 	Description string
 	Schema      json.RawMessage // JSON Schema doc for the input
 	Handler     Handler
+	// Mutating marks tools whose side-effects reach the radio (or any
+	// peer / external system). Replay tools (`ubtctl plan run`) gate
+	// these behind explicit confirmation; the AI dry-run mode stubs them.
+	Mutating bool
 }
 
 // New builds a Spec from a typed handler. The schema is derived from T
 // via reflection — annotate fields with `jsonschema:"required,description=..."`
 // the same way the Anthropic SDK's tool runner expects.
 func New[T any](name, description string, h func(context.Context, T) (Result, error)) (Spec, error) {
+	return NewMutating(name, description, false, h)
+}
+
+// NewMutating is like New but tags the resulting Spec as mutating. Use
+// this for any tool that has visible side-effects (sends a packet, opens
+// a connection, writes to a file). Replay tooling honours the flag.
+func NewMutating[T any](name, description string, mutating bool, h func(context.Context, T) (Result, error)) (Spec, error) {
 	schema, err := buildSchema[T]()
 	if err != nil {
 		return Spec{}, fmt.Errorf("build schema for %s: %w", name, err)
@@ -54,6 +65,7 @@ func New[T any](name, description string, h func(context.Context, T) (Result, er
 		Name:        name,
 		Description: description,
 		Schema:      schema,
+		Mutating:    mutating,
 		Handler: func(ctx context.Context, raw json.RawMessage) (Result, error) {
 			var v T
 			if len(raw) > 0 && string(raw) != "null" {

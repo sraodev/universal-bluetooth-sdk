@@ -86,9 +86,10 @@ func BuildSpecs(c *client.Client, mode ExecMode) (*tools.Registry, error) {
 		return nil, err
 	}
 
-	if err := add(tools.New[SendInput](
+	if err := add(tools.NewMutating[SendInput](
 		"send_payload",
 		"MUTATING: deliver a UTF-8 payload to a peer. In dry-run mode this does not contact the daemon and returns a synthetic result instead.",
+		true,
 		func(ctx context.Context, in SendInput) (tools.Result, error) {
 			if mode == ExecModeDryRun {
 				return jsonResult(map[string]any{

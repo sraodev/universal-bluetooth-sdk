@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -18,15 +19,21 @@ import (
 // The SDK predates the constant for 4.7 but accepts the bare model ID.
 const DefaultModel = "claude-opus-4-7"
 
-// Plan configures one planner run.
-type Plan struct {
-	Goal       string       // user's natural-language request
-	Model      string       // empty → DefaultModel
+// RunConfig configures one planner run. Renamed from Plan to avoid colliding
+// with the on-disk Plan record produced when SavePath is set.
+type RunConfig struct {
+	Goal       string         // user's natural-language request
+	Model      string         // empty → DefaultModel
 	MaxTokens  int64
 	Mode       ExecMode
-	SocketPath string       // surfaced in the system prompt for the model
+	SocketPath string         // surfaced in the system prompt for the model
 	Daemon     *client.Client
-	Out        io.Writer    // where final text + per-step notices go
+	Out        io.Writer      // where final text + per-step notices go
+
+	// SavePath, if non-empty, captures every tool call into a Plan and
+	// writes it to disk after the run completes. Use ubtctl plan run
+	// to replay it later without going back to the LLM.
+	SavePath string
 }
 
 // Run executes the plan against Claude with the daemon-backed tool set.
@@ -35,7 +42,7 @@ type Plan struct {
 // long planning steps. We rely on the SDK's BetaToolRunnerStreaming to
 // handle the agentic loop (call → tool result → call → …) and only step
 // in to surface text deltas to the user.
-func Run(ctx context.Context, p Plan) error {
+func Run(ctx context.Context, p RunConfig) error {
 	if p.Goal == "" {
 		return errors.New("plan: empty goal")
 	}
@@ -62,6 +69,11 @@ func Run(ctx context.Context, p Plan) error {
 	specs, err := BuildSpecs(p.Daemon, p.Mode)
 	if err != nil {
 		return fmt.Errorf("build specs: %w", err)
+	}
+	var rec *recorder
+	if p.SavePath != "" {
+		rec = &recorder{}
+		specs = wrapWithRecorder(specs, rec)
 	}
 	beta, err := AsBetaTools(specs)
 	if err != nil {
@@ -124,6 +136,21 @@ func Run(ctx context.Context, p Plan) error {
 		u := last.Usage
 		fmt.Fprintf(p.Out, "\n[%d input · %d output · %d cache-read · %d iterations]\n",
 			u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, runner.IterationCount())
+	}
+
+	if rec != nil {
+		plan := &Plan{
+			FormatVersion: PlanFormatVersion,
+			Goal:          p.Goal,
+			Mode:          p.Mode.String(),
+			Model:         p.Model,
+			CreatedAt:     time.Now().UTC(),
+			Steps:         rec.snapshot(),
+		}
+		if err := SavePlan(p.SavePath, plan); err != nil {
+			return fmt.Errorf("save plan: %w", err)
+		}
+		fmt.Fprintf(p.Out, "saved plan: %s (%d steps)\n", p.SavePath, len(plan.Steps))
 	}
 	return nil
 }

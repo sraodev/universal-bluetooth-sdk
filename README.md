@@ -1,159 +1,145 @@
 # Universal Bluetooth SDK
 
-Cross-language, multi-service toolkit for building Bluetooth solutions (RFCOMM
-today, BLE-ready tomorrow). The Python SDK is production-ready; other folders
-are scaffolding for future Go/Rust SDKs, microservices, and CLI tooling.
+Cross-language, cross-platform toolkit for building Bluetooth solutions. The
+control plane is a single long-lived daemon (`ubtd`) that owns every radio
+session; everything else — the typed CLI, the AI planner, the MCP server, the
+language SDKs — talks to it through one versioned wire format.
+
+```
+ubtctl  ──┐                                           ┌── BlueZ (Linux)
+ubtctl ask│  ──UDS── ubtd ─── TransportDriver ────────┤
+ubtctl mcp│           │                               ├── CoreBluetooth (TODO)
+MCP client┘           └── audit / policy / sessions   └── WinRT (TODO)
+                                  │
+                                  └── Python / Go / Rust SDKs (same protocol)
+```
+
+## What's working today
+
+- **`ubtd`** — Go daemon, Unix-socket control plane, pluggable transport
+  drivers, structured slog, signal-driven shutdown.
+  - `--driver stub` — in-memory reference driver (any host).
+  - `--driver linuxrfcomm` — BlueZ-backed RFCOMM via the kernel's
+    `AF_BLUETOOTH` socket; `Discover` enumerates known peers via
+    `bluetoothctl devices`.
+- **`ubtctl`** — Go CLI. One binary, several front-ends:
+  - Typed verbs: `ping`, `version`, `status`, `capabilities`,
+    `discover`, `send`.
+  - **AI planner**: `ubtctl ask "<goal>"` runs Claude Opus 4.7 with
+    adaptive thinking against a tool registry that is 1:1 with the
+    daemon's RPC surface.
+  - **MCP server**: `ubtctl mcp` exposes the same tool registry over
+    JSON-RPC 2.0 on stdio, so any MCP-aware editor or agent (Claude
+    Desktop, Cursor, Zed, …) can drive ubtd directly.
+  - **Plan record/replay**: `ubtctl ask --save plan.json …` captures
+    every tool call; `ubtctl plan show / run` replay it later without
+    going back to the LLM. Mutating steps are gated behind `--yes`.
+- **Python SDK (`sdk/python`)** — production-ready PyBluez SDK kept around
+  as the reference implementation and as a path the daemon can shell out to
+  on hosts where a native driver isn't ready yet.
+- **Common contract (`common/protocol/`)** — `v1.proto` IDL (future
+  gRPC) plus `framing.md` describing the v1 wire (length-prefixed JSON
+  over UDS).
 
 ## Repository layout
 
 ```
 .
-├── sdk/
-│   ├── python/          # fully implemented PyBluez SDK
-│   ├── go/              # placeholder for Go SDK
-│   └── rust/            # placeholder for Rust SDK
-├── microservices/
-│   ├── grpc-server/     # future gRPC control-plane
-│   └── rest-server/     # future REST façade
 ├── cli/
-│   └── ubtctl/          # future CLI tool
-├── examples/            # scenario-specific samples
-├── common/              # shared protocols & schemas
-└── docs/                # architecture & guides
+│   ├── ubtd/              # Go daemon (UDS server, dispatcher)
+│   └── ubtctl/            # Go CLI (typed verbs, ai planner, mcp server)
+│       ├── ai/            # Claude tool runner + plan record/replay
+│       ├── client/        # daemon client (length-prefixed JSON codec)
+│       ├── commands/      # subcommand registry (ping/status/.../ask/mcp/plan)
+│       ├── mcp/           # JSON-RPC 2.0 MCP server (stdio)
+│       └── tools/         # neutral Spec/Registry shared by ai + mcp
+├── sdk/
+│   ├── go/pkg/
+│   │   ├── protocol/      # wire envelope + codec
+│   │   ├── sockaddr/      # default socket location
+│   │   └── transport/     # Driver port + Registry
+│   │       ├── stub/         # in-memory reference driver
+│   │       └── linuxrfcomm/  # BlueZ-backed RFCOMM (Linux only)
+│   ├── python/            # production-ready PyBluez SDK
+│   └── rust/              # planned
+├── microservices/
+│   ├── grpc-server/       # planned (REST/gRPC façade for remote callers)
+│   └── rest-server/
+├── common/
+│   ├── protocol/          # v1.proto + framing.md
+│   └── message-schema/
+├── examples/              # scenario samples (chat, sensor stream, file xfer)
+└── docs/
 ```
+
+## Quick start (Go)
+
+```bash
+go build -o bin/ubtd  ./cli/ubtd
+go build -o bin/ubtctl ./cli/ubtctl
+
+# 1. Start the daemon. Use `stub` for a hardware-free dev loop;
+#    on Linux, switch to linuxrfcomm to talk to real radios.
+./bin/ubtd --socket /tmp/ubtd.sock --driver stub &
+
+# 2. Drive it from the typed CLI.
+UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl status
+UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl discover --scan-timeout 3
+
+# 3. Or drive it from natural language (requires ANTHROPIC_API_KEY).
+ANTHROPIC_API_KEY=... ./bin/ubtctl ask \
+  --save /tmp/last.plan.json \
+  "show me the daemon status and list any nearby devices"
+
+# 4. Replay the captured plan against the same daemon — no LLM, no spend.
+UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl plan show /tmp/last.plan.json
+UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl plan run  /tmp/last.plan.json
+
+# 5. Or expose the same tool registry over MCP for editors / external agents.
+./bin/ubtctl mcp --socket /tmp/ubtd.sock      # speaks JSON-RPC on stdio
+```
+
+For per-command flags and MCP client config, see
+[`cli/ubtctl/README.md`](cli/ubtctl/README.md).
 
 ## Python SDK (sdk/python)
 
-### Prerequisites
-
-PyBluez + BlueZ on Linux (tested on Raspberry Pi OS / Ubuntu). Install via the
-helper script:
+Production-ready PyBluez RFCOMM client/server. Tested on Raspberry Pi OS and
+Ubuntu. Detailed setup, troubleshooting, and the full PyBluez fix-up notes
+live in [`sdk/python/README.md`](sdk/python/README.md).
 
 ```bash
 cd sdk/python
 sudo ./scripts/install_dependencies.sh
-```
-
-Or install packages manually (Debian/Ubuntu):
-
-```
-sudo apt-get install python3 python3-dev python3-pip ipython3
-sudo apt-get install bluetooth libbluetooth-dev bluez bluez-tools blueman
-sudo python3 -m pip install pybluez
-```
-
-### Usage
-
-Run commands from `sdk/python` (or set `PYTHONPATH` accordingly).
-
-1. **Start the server (e.g., on Raspberry Pi)**
-   ```bash
-   cd sdk/python
-   sudo python3 run_server.py
-   ```
-   - Customize behaviour via `bluetooth_service/config.py` (`ServerSettings`).
-   - Use `LOG_CFG=/path/to/logger.json` to override the default logger config.
-
-2. **Send data from the client**
-   ```bash
-    cd sdk/python
-    sudo python3 run_client.py
-   ```
-   - Update `bluetooth_service/client_config.py` for UUID, discovery retries,
-     payload source, etc.
-   - Default payload is `text.json`; inject your own `DataSource` for custom
-     payloads.
-
-3. **Run unit tests (no Bluetooth hardware required)**
-   ```bash
-   cd sdk/python
-   python3 -m pip install pytest
-   pytest tests/
-   ```
-   Tests use socket stubs to stay deterministic on any host.
-
-## Platform setup tips
-
-Make your Raspberry Pi discoverable:
-
-```
-sudo hciconfig hci0 piscan
-```
-
-Run the classic inquiry example (optional):
-
-```
-sudo python inquiry.py
-```
-
-## Known Issues
-
-```
-Traceback (most recent call last):
-  File "/usr/share/doc/python-bluez/examples/simple/rfcomm-server.py", line 20, in <module>
-    profiles = [ SERIAL_PORT_PROFILE ],
-  File "/usr/lib/python2.7/dist-packages/bluetooth/bluez.py", line 176, in advertise_service
-    raise BluetoothError (str (e))
-bluetooth.btcommon.BluetoothError: (2, 'No such file or directory')
-```
-
-## Possible fixes
-
-Make sure you are using sudo when running the python script
-Make sure you have the serial profile loaded. How to enable the serial profile.
-
-As it turns out, the culprit is bluetoothd, the Bluetooth daemon. Using SDP with bluetoothd requires deprecated features for some silly reason, so to fix this, the daemon must be started in compatibility mode with bluetoothd -C (or bluetooth --compat).
-
-You need to run the Bluetooth daemon in 'compatibility' mode. Edit /lib/systemd/system/bluetooth.service and add '-C' after 'bluetoothd'. Reboot.
-
-```
-sudo sdptool add SP
-```
-
-Or
-
-Find location of bluetooth.service by:
-
-```
-systemctl status bluetooth.service
-```
-Then edit bluetooth.service and look for ExecStart=/usr/libexec/bluetooth/bluetoothd
-Append --compat at the end of this line, save, and then run
-
-```
-service bluetooth start
-```
-
-If all goes well, you should be able to successfully run
-
-```
-sudo sdptool browse local
-```
-
-Finally, reset the adapter:
-
-```
-sudo hciconfig -a hci0 reset
+sudo python3 run_server.py
+sudo python3 run_client.py
 ```
 
 ## Roadmap
 
-- Flesh out Go/Rust SDKs under `sdk/`.
-- Build microservices (gRPC + REST) that wrap the SDK for remote control.
-- Ship `ubtctl` CLI for device management.
-- Provide ready-to-run examples (chat, sensor stream, file transfer).
+- **CoreBluetooth (macOS) and WinRT (Windows) drivers** — same `Driver`
+  interface as `linuxrfcomm`; the daemon already advertises the capability
+  matrix at runtime.
+- **`Listen` / `Reply` RPCs** — bidirectional RFCOMM sessions for chat /
+  long-lived data streams (foundation for an offline Bluetooth chat app
+  with a local-AI assist).
+- **gRPC v2 wire** — generated from `common/protocol/v1.proto`,
+  alongside the JSON-over-UDS v1 wire during migration.
+- **Native Go and Rust SDKs** — same `protocol` package the daemon and CLI
+  already use.
+- **`microservices/{grpc,rest}-server`** — remote control planes that
+  re-export the daemon surface.
 
-<!-- CONTRIBUTING -->
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**. Please read the [contribution guidelines](https://github.com/sraodev/super-opensource-cheat-sheets/blob/master/contributing.md) first.
+Issues and PRs welcome. Read the
+[contribution guidelines](https://github.com/sraodev/super-opensource-cheat-sheets/blob/master/contributing.md)
+first.
 
-## Reference
+## References
 
-[Bluetooth Programming with Python 3](http://blog.kevindoran.co/bluetooth-programming-with-python-3)
-
-[Bluetooth programming with Python - PyBluez](https://people.csail.mit.edu/albert/bluez-intro/x232.html)
-
-[Bluetooth for Programmers](http://people.csail.mit.edu/rudolph/Teaching/Articles/PartOfBTBook.pdf)
-
-[Bluetooth Python extension module](https://github.com/karulis/pybluez)
+- [Bluetooth Programming with Python 3](http://blog.kevindoran.co/bluetooth-programming-with-python-3)
+- [Bluetooth Programming with Python — PyBluez](https://people.csail.mit.edu/albert/bluez-intro/x232.html)
+- [Bluetooth for Programmers](http://people.csail.mit.edu/rudolph/Teaching/Articles/PartOfBTBook.pdf)
+- [PyBluez](https://github.com/karulis/pybluez)
+- [Model Context Protocol](https://modelcontextprotocol.io/)

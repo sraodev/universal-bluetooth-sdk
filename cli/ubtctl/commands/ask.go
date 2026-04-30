@@ -27,6 +27,7 @@ func (askCmd) Run(args []string, _ RootInfo) error {
 	dryRun := fs.Bool("dry-run", false, "skip mutating tool calls; the model still plans and reads, but Send is stubbed")
 	yes := fs.Bool("yes", false, "auto-approve mutating tool calls (currently the only mutator is Send)")
 	model := fs.String("model", "", "override the Claude model (default claude-opus-4-7)")
+	save := fs.String("save", "", "write the recorded tool-call plan to FILE (replay later with: ubtctl plan run FILE)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -54,13 +55,14 @@ func (askCmd) Run(args []string, _ RootInfo) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	return ai.Run(ctx, ai.Plan{
+	return ai.Run(ctx, ai.RunConfig{
 		Goal:       goal,
 		Model:      *model,
 		Mode:       mode,
 		SocketPath: *socket,
 		Daemon:     c,
 		Out:        os.Stdout,
+		SavePath:   *save,
 	})
 }
 

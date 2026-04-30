@@ -48,6 +48,7 @@ UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl send --address AA:BB:CC:DD:EE:01 --data 
 | `send`          | Push a payload (`--data`, `--file`, or stdin)        |
 | `ask`           | Natural-language goal → AI planner → daemon RPCs     |
 | `mcp`           | Serve the tool registry over MCP on stdio            |
+| `plan`          | Show / replay a saved AI plan (no LLM)               |
 
 Run `ubtctl <command> -h` for per-command flags.
 
@@ -70,6 +71,33 @@ run; the only mutator (`send_payload`) honours `--dry-run` and `--yes`.
 The system prompt + tool list are kept stable across runs and marked with
 `cache_control: ephemeral`, so subsequent invocations read the cached prefix
 instead of paying for it.
+
+## Plan record / replay (`ubtctl ask --save` + `ubtctl plan`)
+
+Every `ubtctl ask` run can capture its tool-call trace into a JSON file.
+The saved plan is human-readable, version-controllable, and replayable
+against the daemon **without going back to the LLM** — useful for
+auditing, runbooks, CI smoke-tests, and "I want to do that exact thing
+again."
+
+```bash
+# 1. Run the AI once and save the trace.
+ubtctl ask --save /tmp/morning-check.plan.json \
+  "ping the daemon, list capabilities, and discover devices"
+
+# 2. Pretty-print the captured plan.
+ubtctl plan show /tmp/morning-check.plan.json
+
+# 3. Replay it. Read-only steps run by default; mutating steps require --yes.
+ubtctl plan run /tmp/morning-check.plan.json           # blocked if the plan
+                                                       # contains send_payload
+ubtctl plan run --yes /tmp/morning-check.plan.json     # allowed
+ubtctl plan run --dry-run /tmp/morning-check.plan.json # never contacts ubtd
+```
+
+Plans are versioned (`format_version: 1`); replay refuses unknown versions
+rather than mis-execute. Mutating steps carry a `mutating: true` flag in
+the JSON so reviewers can diff for side-effects before approving a script.
 
 ## MCP server (`ubtctl mcp`)
 
