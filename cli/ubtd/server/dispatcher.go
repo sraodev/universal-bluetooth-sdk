@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -140,7 +141,7 @@ func (s *Server) handleDiscover(ctx context.Context, c net.Conn, req *protocol.E
 		s.writeEvent(c, req.ID, protocol.MethodDiscover, dev)
 	}
 	if err := <-errCh; err != nil && err != context.DeadlineExceeded && err != context.Canceled {
-		s.writeError(c, req.ID, protocol.CodeTransportError, err.Error())
+		s.writeDriverError(c, req.ID, err)
 		return
 	}
 	s.writeResult(c, req.ID, map[string]any{})
@@ -163,10 +164,21 @@ func (s *Server) handleSend(ctx context.Context, c net.Conn, req *protocol.Envel
 	}
 	res, err := driver.Send(ctx, p)
 	if err != nil {
-		s.writeError(c, req.ID, protocol.CodeTransportError, err.Error())
+		s.writeDriverError(c, req.ID, err)
 		return
 	}
 	s.writeResult(c, req.ID, res)
+}
+
+// writeDriverError preserves the structured error code from a driver if it
+// returned a *protocol.Error; otherwise falls back to CodeTransportError.
+func (s *Server) writeDriverError(c net.Conn, id string, err error) {
+	var pe *protocol.Error
+	if errors.As(err, &pe) {
+		s.writeError(c, id, pe.Code, pe.Message)
+		return
+	}
+	s.writeError(c, id, protocol.CodeTransportError, err.Error())
 }
 
 // ---------------------------------------------------------------------------

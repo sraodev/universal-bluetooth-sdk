@@ -20,6 +20,7 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtd/server"
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/sockaddr"
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/transport"
+	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/transport/linuxrfcomm"
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/transport/stub"
 )
 
@@ -31,15 +32,22 @@ var (
 
 func main() {
 	socket := flag.String("socket", sockaddr.Default(), "Unix domain socket path")
-	useStub := flag.Bool("stub", true, "register the in-memory stub driver (default true while real drivers are not yet wired up)")
+	driver := flag.String("driver", "stub", "transport driver: stub | linuxrfcomm")
+	bluetoothctl := flag.String("bluetoothctl", "", "override path to bluetoothctl (linuxrfcomm only; default = PATH lookup)")
 	logJSON := flag.Bool("log-json", false, "emit JSON-structured logs")
 	flag.Parse()
 
 	log := newLogger(*logJSON)
 
 	registry := transport.NewRegistry()
-	if *useStub {
+	switch *driver {
+	case "stub":
 		registry.Register(stub.New())
+	case "linuxrfcomm":
+		registry.Register(linuxrfcomm.New(*bluetoothctl))
+	default:
+		log.Error("unknown driver", "name", *driver, "supported", []string{"stub", "linuxrfcomm"})
+		os.Exit(2)
 	}
 	defer registry.Close()
 

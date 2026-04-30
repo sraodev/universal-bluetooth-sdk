@@ -22,8 +22,11 @@ go build -o bin/ubtctl ./cli/ubtctl
 ## Quick start
 
 ```bash
-# 1. Start the daemon (registers the in-memory stub driver by default).
+# 1a. Start the daemon with the in-memory stub (works on any host).
 ./bin/ubtd --socket /tmp/ubtd.sock &
+
+# 1b. Or, on Linux, register the BlueZ-backed RFCOMM driver:
+sudo ./bin/ubtd --socket /tmp/ubtd.sock --driver linuxrfcomm &
 
 # 2. Talk to it.
 UBTD_SOCKET=/tmp/ubtd.sock ./bin/ubtctl version
