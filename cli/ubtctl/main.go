@@ -14,11 +14,8 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/commands"
 )
 
-// Set at link time alongside ubtd.
-var (
-	cliVersion = "0.1.0-dev"
-	commit     = "unknown"
-)
+// cliVersion can be overridden at link time via -ldflags "-X main.cliVersion=...".
+var cliVersion = "0.1.0-dev"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -33,7 +30,7 @@ func main() {
 		commands.PrintRootUsage(cliVersion)
 		os.Exit(2)
 	}
-	if err := cmd.Run(args, commands.RootInfo{CLIVersion: cliVersion, Commit: commit}); err != nil {
+	if err := cmd.Run(args, commands.RootInfo{CLIVersion: cliVersion}); err != nil {
 		fmt.Fprintf(os.Stderr, "ubtctl %s: %v\n", name, err)
 		os.Exit(1)
 	}

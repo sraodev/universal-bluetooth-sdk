@@ -90,7 +90,7 @@ func (c *Client) send(method string, params any) (string, error) {
 		ID:     id,
 		Kind:   protocol.KindRequest,
 		Method: method,
-		Params: paramsMap(params),
+		Params: toMap(params),
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -114,17 +114,6 @@ func (c *Client) readNext(ctx context.Context) (*protocol.Envelope, error) {
 		return nil, err
 	}
 	return env, nil
-}
-
-func paramsMap(p any) map[string]any {
-	if p == nil {
-		return nil
-	}
-	if m, ok := p.(map[string]any); ok {
-		return m
-	}
-	// Marshal-then-unmarshal; small structs only.
-	return marshalToMap(p)
 }
 
 func newID() (string, error) {

@@ -19,17 +19,15 @@ import (
 type Server struct {
 	log      *slog.Logger
 	registry *transport.Registry
-	commit   string
 	version  string
 
 	sessions atomic.Int64
 }
 
-func New(log *slog.Logger, registry *transport.Registry, daemonVersion, commit string) *Server {
+func New(log *slog.Logger, registry *transport.Registry, daemonVersion string) *Server {
 	return &Server{
 		log:      log,
 		registry: registry,
-		commit:   commit,
 		version:  daemonVersion,
 	}
 }
@@ -88,7 +86,6 @@ func (s *Server) dispatch(ctx context.Context, c net.Conn, req *protocol.Envelop
 		s.writeResult(c, req.ID, protocol.VersionResult{
 			DaemonVersion:   s.version,
 			ProtocolVersion: protocol.Version,
-			Commit:          s.commit,
 		})
 	case protocol.MethodCapabilities:
 		s.writeResult(c, req.ID, protocol.CapabilitiesResult{Capabilities: s.registry.Capabilities()})

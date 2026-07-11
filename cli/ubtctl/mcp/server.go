@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/tools"
 )
@@ -24,14 +23,13 @@ import (
 // adopt newer revisions; clients negotiate via initialize.
 const ProtocolVersion = "2025-03-26"
 
-// Server is a single MCP session over a paired Reader/Writer.
+// Server is a single MCP session over a paired Reader/Writer. handleLine
+// runs sequentially from Serve, so writes don't need synchronisation.
 type Server struct {
 	registry *tools.Registry
 	log      *slog.Logger
 	name     string
 	version  string
-
-	wmu sync.Mutex // serialises stdout writes
 }
 
 func New(reg *tools.Registry, name, version string, log *slog.Logger) *Server {
@@ -215,8 +213,6 @@ func (s *Server) write(out io.Writer, env *rpcResponse) {
 		s.log.Error("marshal response", "err", err)
 		return
 	}
-	s.wmu.Lock()
-	defer s.wmu.Unlock()
 	if _, err := out.Write(append(b, '\n')); err != nil {
 		s.log.Error("write response", "err", err)
 	}

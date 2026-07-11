@@ -36,10 +36,7 @@ func (mcpCmd) Run(args []string, info RootInfo) error {
 	}
 	defer c.Close()
 
-	registry, err := ai.BuildSpecs(c, ai.ExecModeNormal)
-	if err != nil {
-		return err
-	}
+	registry := ai.BuildSpecs(c, false)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
