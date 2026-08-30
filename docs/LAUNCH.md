@@ -29,10 +29,11 @@ The generator's font path targets macOS; change it for another authoring host.
 
 ## Before announcing
 
-- Merge reviewed changes; verify both CI jobs on GitHub. Only then add a CI badge
-  and require those exact successful check names for merging.
+- Native Linux and macOS CI passed on [PR #16](https://github.com/sraodev/universal-bluetooth-sdk/pull/16).
+  The README CI badge is added; both exact GitHub Actions checks are required.
 - Master is protected from deletion and force pushes by an active ruleset created
-  2026-08-30. Required status checks are intentionally not configured yet.
+  2026-08-30. `Go (ubuntu-latest)` and `Go (macos-latest)` are required, with
+  the branch required to be up to date.
 - About/topics copy is applied. Social-preview upload is a separate repository
   setting; verify the live preview after uploading.
 - Private vulnerability reporting was enabled on 2026-08-30. Use the repository

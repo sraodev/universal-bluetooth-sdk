@@ -91,7 +91,7 @@ exit 0
 
 - Linux builds and Linux driver tests were **cross-compiled, not executed**.
   Docker was unavailable; no Linux VM or physical adapter was used. The new
-  Linux/macOS CI matrix is prepared locally but has not run on GitHub yet.
+  Linux/macOS CI matrix was subsequently executed successfully on GitHub; see below.
 - `PYTHONPATH=sdk/python .venv/bin/python -m pytest sdk/python/tests -q` cannot
   collect the legacy suite on this host: `ModuleNotFoundError: No module named
   'bluetooth'` (two collection errors). PyBluez is not installed. The legacy SDK
@@ -108,7 +108,9 @@ exit 0
 
 - Active ruleset [Protect master](https://github.com/sraodev/universal-bluetooth-sdk/rules/21847044)
   blocks deletion and non-fast-forward updates; no bypass actors. Read-back
-  confirmed `protected: true`. No required CI checks were added before publication.
+  confirmed `protected: true`. After successful native GitHub runs, both
+  `Go (ubuntu-latest)` and `Go (macos-latest)` were made required, tied to the
+  GitHub Actions app, with strict up-to-date checking.
 - Nine scoped contributor issues plus [tracking issue #14](https://github.com/sraodev/universal-bluetooth-sdk/issues/14)
   were published. Two are marked `good first issue`; nine have `help wanted`.
 
@@ -117,3 +119,12 @@ authorized publication; see the pull-request checks and repository rules for liv
 CI and protection status. About/topics and private vulnerability reporting were
 configured as part of that follow-up. Hardware and legacy Python limitations above
 remain in effect.
+
+## Native CI follow-up
+
+[GitHub run 33301222523](https://github.com/sraodev/universal-bluetooth-sdk/actions/runs/33301222523)
+passed both Linux and macOS jobs for commit
+`87088b706279ed1a41e8f68eb91af39d15f4db95`. Each ran Go vet, formatting,
+race tests, binary builds, stub/MCP smoke, and local-draft fake-server tests.
+This adds native Linux evidence but is still not physical Bluetooth or live model
+validation. Subsequent PR checks remain authoritative for later commits.

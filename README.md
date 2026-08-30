@@ -5,6 +5,7 @@
 Build against one local API. Try it without a radio, send RFCOMM payloads on Linux,
 and help build the missing foundations for nearby chat and local AI assistants.
 
+[![CI](https://github.com/sraodev/universal-bluetooth-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/sraodev/universal-bluetooth-sdk/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 [![Status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)](ROADMAP.md)
 [![Help wanted](https://img.shields.io/github/issues/sraodev/universal-bluetooth-sdk/help%20wanted)](https://github.com/sraodev/universal-bluetooth-sdk/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22)
