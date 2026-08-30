@@ -1,34 +1,18 @@
 # Documentation
 
-Most of the architectural detail lives next to the code it describes.
-This directory is the **long-form docs index**; per-package READMEs
-remain canonical for the components they live in.
-
-## Canonical entry points
-
-| You want to read about… | Go here |
+| Need | Read |
 |---|---|
-| The whole project: design, structure, pros/cons, full usage walkthrough | [`/README.md`](../README.md) at the repo root |
-| The wire protocol (methods, framing, error codes) | [`common/protocol/`](../common/protocol/) |
-| Payload schemas (chat, file-chunk, sensor records) | [`common/message-schema/`](../common/message-schema/) |
-| The daemon and CLI (typed verbs, AI planner, MCP, plan replay) | [`cli/ubtctl/`](../cli/ubtctl/) |
-| The transport driver port + reference / native implementations | [`sdk/go/`](../sdk/go/) |
-| The reference Python SDK (PyBluez RFCOMM client/server) | [`sdk/python/`](../sdk/python/) |
-| Future microservice facades (gRPC / REST) | [`microservices/`](../microservices/) |
-| Example apps (chat, file transfer, sensor stream) | [`examples/`](../examples/) |
+| Install and try without hardware | [README](../README.md) |
+| CLI, cloud planner, MCP, replay | [CLI guide](../cli/ubtctl/README.md) |
+| BLE chat / Bitchat / local AI direction | [Design and upstream research](CHAT_AND_LOCAL_AI.md) |
+| Optional local AI example | [Draft, review, send](../examples/chat/README.md) |
+| Milestone acceptance gates | [Roadmap](../ROADMAP.md) |
+| Contributor backlog | [Issues](ISSUES.md) |
+| Contributing and tests | [Contributing](../CONTRIBUTING.md) |
+| Physical device evidence | [Hardware testing](HARDWARE_TESTING.md) |
+| Security limits and reporting | [Security](../SECURITY.md) |
+| Local wire format | [Framing](../common/protocol/framing.md) |
+| Relaunch copy and measurement | [Launch checklist](LAUNCH.md) |
+| Validation evidence for this update | [Verification](VERIFICATION.md) |
 
-## What lands here over time
-
-- **Design proposals** for breaking changes (protocol v2, multi-peer
-  sessions, RBAC policy) — submitted as Markdown PRs, reviewed before
-  the corresponding code lands.
-- **ADRs** (architecture decision records) capturing decisions whose
-  rationale wouldn't survive in a commit message.
-- **Onboarding** for new contributors: how to set up a dev loop, how
-  to run the smoke tests, how to add a new transport driver.
-- **Operations**: deployment recipes for `ubtd` (systemd unit, K8s
-  manifest, container image), once they exist.
-
-Until any of those land, this directory is intentionally light — the
-top-level [`README.md`](../README.md) is the project's canonical
-architecture document.
+The Rust SDK, remote facades, file-transfer app and sensor app are placeholders.

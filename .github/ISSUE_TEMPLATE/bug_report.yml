@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a reproducible failure with non-sensitive data.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not post security exploits or private data. See SECURITY.md.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Commit, OS, Go/Python version, driver, adapter and peer model. Say if this is stub-only.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Exact commands, expected result, actual result, and redacted logs.
+    validations:
+      required: true

@@ -8,3 +8,7 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+
+# Private example output and local tooling
+/draft.txt
+.pytest_cache/

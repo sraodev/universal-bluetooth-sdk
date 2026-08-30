@@ -1,0 +1,17 @@
+name: Hardware test report
+description: Share reproducible Bluetooth results, including failures.
+body:
+  - type: textarea
+    id: setup
+    attributes:
+      label: Hardware and software
+      description: Commit, OS/kernel/BlueZ, adapter chipset, peer, channel and permissions. Redact addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Commands and observed results
+      description: Use docs/HARDWARE_TESTING.md. Include peer-side receipt, disconnection behavior and limitations.
+    validations:
+      required: true

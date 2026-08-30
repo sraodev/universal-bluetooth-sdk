@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security guidance
+    url: https://github.com/sraodev/universal-bluetooth-sdk/blob/master/SECURITY.md
+    about: Read this before reporting a sensitive issue. Do not publish exploit details.

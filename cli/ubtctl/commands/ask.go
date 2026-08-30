@@ -15,8 +15,10 @@ import (
 
 type askCmd struct{}
 
-func (askCmd) Name() string     { return "ask" }
-func (askCmd) Synopsis() string { return "natural-language goal → AI planner → tool calls against ubtd" }
+func (askCmd) Name() string { return "ask" }
+func (askCmd) Synopsis() string {
+	return "natural-language goal → AI planner → tool calls against ubtd"
+}
 
 func (askCmd) Run(args []string, _ RootInfo) error {
 	fs := flag.NewFlagSet("ask", flag.ContinueOnError)
