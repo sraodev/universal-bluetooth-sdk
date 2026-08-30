@@ -8,6 +8,8 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"os"
 
@@ -18,20 +20,44 @@ import (
 var cliVersion = "0.1.0-dev"
 
 func main() {
-	if len(os.Args) < 2 {
-		commands.PrintRootUsage(cliVersion)
-		os.Exit(2)
+	os.Exit(run(os.Args[1:], cliVersion))
+}
+
+func run(args []string, version string) int {
+	if len(args) == 0 {
+		commands.PrintRootUsage(version)
+		return 2
 	}
 
-	name, args := os.Args[1], os.Args[2:]
+	name, subArgs := args[0], args[1:]
+	if name == "help" || name == "-h" || name == "--help" || name == "-help" {
+		if len(subArgs) > 0 {
+			subName := subArgs[0]
+			cmd, ok := commands.Lookup(subName)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "ubtctl: unknown command %q\n\n", subName)
+				commands.PrintRootUsage(version)
+				return 2
+			}
+			_ = cmd.Run([]string{"-h"}, commands.RootInfo{CLIVersion: version})
+			return 0
+		}
+		commands.PrintRootUsage(version)
+		return 0
+	}
+
 	cmd, ok := commands.Lookup(name)
 	if !ok {
 		fmt.Fprintf(os.Stderr, "ubtctl: unknown command %q\n\n", name)
-		commands.PrintRootUsage(cliVersion)
-		os.Exit(2)
+		commands.PrintRootUsage(version)
+		return 2
 	}
-	if err := cmd.Run(args, commands.RootInfo{CLIVersion: cliVersion}); err != nil {
+	if err := cmd.Run(subArgs, commands.RootInfo{CLIVersion: version}); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		fmt.Fprintf(os.Stderr, "ubtctl %s: %v\n", name, err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
