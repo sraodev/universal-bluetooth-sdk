@@ -41,12 +41,12 @@ func init() { register(planCmd{}) }
 func printPlanUsage() {
 	fmt.Println(`Usage:
   ubtctl plan show <file>            print a saved plan as a human-readable summary
-  ubtctl plan run  <file> [flags]    re-execute a saved plan against ubtd (no LLM)
+  ubtctl plan run  [flags] <file>    re-execute a saved plan against ubtd (no LLM)
 
 plan run flags:
   --socket <path>   override ubtd socket path (env UBTD_SOCKET)
   --dry-run         print what would run; do not contact the daemon
-  --yes             allow steps tagged "mutating" (otherwise plan run aborts)`)
+  --yes             allow mutating tools (otherwise plan run aborts)`)
 }
 
 // ---------------------------------------------------------------------------
@@ -93,24 +93,27 @@ func planRun(args []string) error {
 	fs := flag.NewFlagSet("plan run", flag.ContinueOnError)
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
 	dryRun := fs.Bool("dry-run", false, "print what would run; do not contact the daemon")
-	yes := fs.Bool("yes", false, "allow steps tagged as mutating")
+	yes := fs.Bool("yes", false, "allow mutating tools")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	rest := fs.Args()
-	if len(rest) == 0 {
-		return errors.New("plan run: missing file path")
+	if len(rest) != 1 {
+		return errors.New("plan run: provide one file path; flags must precede the path")
 	}
 	p, err := ai.LoadPlan(rest[0])
 	if err != nil {
 		return err
 	}
 
-	c, err := client.Dial(*socket)
-	if err != nil {
-		return err
+	var c *client.Client
+	if !*dryRun {
+		c, err = client.Dial(*socket)
+		if err != nil {
+			return err
+		}
+		defer c.Close()
 	}
-	defer c.Close()
 
 	registry := ai.BuildSpecs(c, false)
 	return ai.Replay(context.Background(), p, registry, ai.ReplayOptions{

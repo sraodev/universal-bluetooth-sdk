@@ -1,9 +1,9 @@
 # Wire framing — v1
 
 The control-plane connection between `ubtctl` and `ubtd` is a length-prefixed
-stream of JSON envelopes over a Unix domain socket (or TCP, for remote
-deployments). The schema mirrors `v1.proto`; switching to gRPC is a transport
-swap, not a redesign.
+stream of JSON envelopes over a local Unix domain socket. TCP and gRPC servers
+are not implemented. The Go types are the implemented schema; `v1.proto` is a
+design counterpart and does not generate the current JSON bindings.
 
 ## Frame
 
@@ -14,7 +14,8 @@ swap, not a redesign.
 +---------------------+----------------------------+
 ```
 
-Maximum body size is 16 MiB; the daemon rejects larger frames with `frame_too_large`.
+Maximum body size is 16 MiB; the frame reader returns `frame_too_large` for larger frames. The daemon closes
+the connection on framing errors; it does not send a structured RPC error for them.
 
 ## Envelope
 

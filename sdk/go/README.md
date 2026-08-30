@@ -25,7 +25,7 @@ sdk/go/pkg/
 | `protocol` | Wire envelope (`Envelope`, `Error`, method constants), `WriteFrame` / `ReadFrame` length-prefixed codec, request/response/event payload types. Imported by both daemon and CLI. |
 | `sockaddr` | One function: `Default()` returns the daemon socket path, honouring `UBTD_SOCKET` → `$XDG_RUNTIME_DIR/ubtd.sock` → `/tmp/ubtd.sock`. Imported anywhere a process talks to or hosts the daemon. |
 | `transport` | The `Driver` interface + a `Registry` that maps names ↔ transports ↔ drivers. The daemon creates a registry at startup and registers exactly one driver into it (controlled by `--driver`). |
-| `transport/stub` | Reference driver. `Send` succeeds for any well-formed address; `Discover` emits two synthetic devices. Used by every test in this repo and by anyone doing local dev without hardware. |
+| `transport/stub` | Reference driver. `Send` currently accepts any nonempty address; `Discover` emits two synthetic devices. Used for local development and smoke tests without hardware. |
 | `transport/linuxrfcomm` | Real RFCOMM. `Send` opens an `AF_BLUETOOTH / SOCK_STREAM / BTPROTO_RFCOMM` socket via `golang.org/x/sys/unix` and writes directly. `Discover` shells out to `bluetoothctl devices` and parses the output. Build-tagged: non-Linux builds compile a stub that returns `not_implemented`. |
 
 ## Driver contract
@@ -54,9 +54,9 @@ single code.
 |---|---|
 | `protocol` (codec, types, error codes) | **Implemented** (wire v1). Round-trip tests in `pkg/protocol/codec_test.go`. |
 | `transport.Driver` interface + `Registry` | **Implemented** |
-| `transport/stub` | **Implemented**. Reference driver used by every test and the default `--driver stub` flag. |
+| `transport/stub` | **Implemented**. Reference driver and the default `--driver stub` flag. |
 | `transport/linuxrfcomm` | **Implemented** (Send + Discover via bluetoothctl). Tests cover BD address parsing and the `bluetoothctl devices` line parser. |
 | CoreBluetooth driver (macOS) | Planned. Same `Driver` contract, `framework CoreBluetooth` via cgo. |
 | WinRT driver (Windows) | Planned. Same `Driver` contract, WinRT bindings. |
-| `transport.Listener` (bidirectional sessions) | Planned. Phase 2 of the [roadmap](../../README.md#roadmap). |
+| `transport.Listener` (bidirectional sessions) | Planned. See the [roadmap](../../ROADMAP.md). |
 | gRPC v2 wire | Planned. Will be generated from [`common/protocol/v1.proto`](../../common/protocol/v1.proto) and run alongside the v1 JSON wire during migration. |

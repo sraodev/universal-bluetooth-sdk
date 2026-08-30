@@ -53,6 +53,9 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		go func(c net.Conn) {
 			defer wg.Done()
 			defer c.Close()
+			// Wake a client blocked in frame I/O when the daemon shuts down.
+			stop := context.AfterFunc(ctx, func() { _ = c.Close() })
+			defer stop()
 			s.handleConn(ctx, c)
 		}(conn)
 	}

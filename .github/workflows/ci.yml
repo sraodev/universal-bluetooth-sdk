@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  go:
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - name: Formatting
+        run: test -z "$(gofmt -l cli sdk/go)"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build -o bin/ubtd ./cli/ubtd
+      - run: go build -o bin/ubtctl ./cli/ubtctl
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/smoke.py
+      - run: python3 -m unittest discover -s examples/chat -p 'test_*.py' -v
