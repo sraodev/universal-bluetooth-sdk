@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"flag"
 	"os"
 	"os/signal"
 	"strings"
@@ -21,12 +20,12 @@ func (askCmd) Synopsis() string {
 }
 
 func (askCmd) Run(args []string, _ RootInfo) error {
-	fs := flag.NewFlagSet("ask", flag.ContinueOnError)
+	fs := newFlagSet("ask")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
 	dryRun := fs.Bool("dry-run", false, "skip mutating tool calls; the model still plans and reads, but Send is stubbed")
 	model := fs.String("model", "", "override the Claude model (default claude-opus-4-7)")
 	save := fs.String("save", "", "write the recorded tool-call plan to FILE (replay later with: ubtctl plan run FILE)")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	goal := strings.TrimSpace(strings.Join(fs.Args(), " "))

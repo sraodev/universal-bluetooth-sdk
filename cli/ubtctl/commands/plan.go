@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -90,11 +89,11 @@ func planShow(args []string) error {
 // ---------------------------------------------------------------------------
 
 func planRun(args []string) error {
-	fs := flag.NewFlagSet("plan run", flag.ContinueOnError)
+	fs := newFlagSet("plan run")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
 	dryRun := fs.Bool("dry-run", false, "print what would run; do not contact the daemon")
 	yes := fs.Bool("yes", false, "allow mutating tools")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	rest := fs.Args()
