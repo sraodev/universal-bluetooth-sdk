@@ -8,6 +8,7 @@ package commands
 
 import (
 	"fmt"
+	"io"
 	"sort"
 )
 
@@ -32,21 +33,29 @@ func Lookup(name string) (Command, bool) {
 	return c, ok
 }
 
-func PrintRootUsage(version string) {
-	fmt.Printf("ubtctl %s — Universal Bluetooth CLI\n\n", version)
-	fmt.Println("Usage:")
-	fmt.Println("  ubtctl <command> [flags]")
-	fmt.Println()
-	fmt.Println("Commands:")
+// PrintRootUsage writes the command list to w. The caller picks the stream:
+// stdout when the user asked for help, stderr when usage accompanies an error.
+func PrintRootUsage(w io.Writer, version string) {
+	fmt.Fprintf(w, "ubtctl %s — Universal Bluetooth CLI\n\n", version)
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  ubtctl <command> [flags]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	names := Names()
+	for _, n := range names {
+		fmt.Fprintf(w, "  %-12s %s\n", n, registry[n].Synopsis())
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Flags common to all commands:")
+	fmt.Fprintln(w, "  --socket <path>   override ubtd socket path (env UBTD_SOCKET)")
+}
+
+// Names returns the registered command names in sorted order.
+func Names() []string {
 	names := make([]string, 0, len(registry))
 	for n := range registry {
 		names = append(names, n)
 	}
 	sort.Strings(names)
-	for _, n := range names {
-		fmt.Printf("  %-12s %s\n", n, registry[n].Synopsis())
-	}
-	fmt.Println()
-	fmt.Println("Flags common to all commands:")
-	fmt.Println("  --socket <path>   override ubtd socket path (env UBTD_SOCKET)")
+	return names
 }

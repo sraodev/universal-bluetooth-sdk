@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"flag"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -21,9 +20,9 @@ func (mcpCmd) Synopsis() string {
 }
 
 func (mcpCmd) Run(args []string, info RootInfo) error {
-	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	fs := newFlagSet("mcp")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 

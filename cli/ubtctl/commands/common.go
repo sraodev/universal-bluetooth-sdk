@@ -2,7 +2,10 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"io"
+	"os"
 	"time"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -10,6 +13,25 @@ import (
 )
 
 func defaultSocket() string { return sockaddr.Default() }
+
+func newFlagSet(name string) *flag.FlagSet {
+	return flag.NewFlagSet(name, flag.ContinueOnError)
+}
+
+// parseFlags parses args and prints usage only when the user asked for it.
+//
+// flag writes help text and parse diagnostics to the same writer, so it gets
+// none: requested help is output and belongs on stdout, while a bad flag is
+// reported once by main on stderr rather than twice on two streams.
+func parseFlags(fs *flag.FlagSet, args []string) error {
+	fs.SetOutput(io.Discard)
+	err := fs.Parse(args)
+	if errors.Is(err, flag.ErrHelp) {
+		fs.SetOutput(os.Stdout)
+		fs.Usage()
+	}
+	return err
+}
 
 type baseFlags struct {
 	socket  string
