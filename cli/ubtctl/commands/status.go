@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"flag"
 	"fmt"
 	"strings"
 
@@ -15,10 +14,10 @@ func (statusCmd) Name() string     { return "status" }
 func (statusCmd) Synopsis() string { return "show daemon health and registered drivers" }
 
 func (statusCmd) Run(args []string, _ RootInfo) error {
-	fs := flag.NewFlagSet("status", flag.ContinueOnError)
+	fs := newFlagSet("status")
 	var b baseFlags
 	bindBase(fs, &b)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 

@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"flag"
 	"fmt"
 	"time"
 
@@ -15,10 +14,10 @@ func (pingCmd) Name() string     { return "ping" }
 func (pingCmd) Synopsis() string { return "round-trip a Ping request to ubtd (clock skew + liveness)" }
 
 func (pingCmd) Run(args []string, _ RootInfo) error {
-	fs := flag.NewFlagSet("ping", flag.ContinueOnError)
+	fs := newFlagSet("ping")
 	var b baseFlags
 	bindBase(fs, &b)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 

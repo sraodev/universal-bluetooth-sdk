@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"flag"
 	"fmt"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -14,11 +13,11 @@ func (versionCmd) Name() string     { return "version" }
 func (versionCmd) Synopsis() string { return "print CLI + daemon + protocol versions" }
 
 func (versionCmd) Run(args []string, info RootInfo) error {
-	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	fs := newFlagSet("version")
 	var b baseFlags
 	bindBase(fs, &b)
 	clientOnly := fs.Bool("client-only", false, "skip the daemon round-trip")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 

@@ -2,7 +2,6 @@ package commands
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -17,7 +16,7 @@ func (sendCmd) Name() string     { return "send" }
 func (sendCmd) Synopsis() string { return "send a payload to a peer (file, stdin, or --data)" }
 
 func (sendCmd) Run(args []string, _ RootInfo) error {
-	fs := flag.NewFlagSet("send", flag.ContinueOnError)
+	fs := newFlagSet("send")
 	var b baseFlags
 	bindBase(fs, &b)
 	address := fs.String("address", "", "peer address (required)")
@@ -25,7 +24,7 @@ func (sendCmd) Run(args []string, _ RootInfo) error {
 	port := fs.Int("port", 0, "RFCOMM channel / GATT handle (0 = driver default)")
 	file := fs.String("file", "", "read payload from file ('-' for stdin)")
 	inline := fs.String("data", "", "inline payload string (mutually exclusive with --file)")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if *address == "" {

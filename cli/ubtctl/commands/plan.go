@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -57,6 +56,11 @@ func planShow(args []string) error {
 	if len(args) == 0 {
 		return errors.New("plan show: missing file path")
 	}
+	// Without this, -h is opened as a filename and reported as a missing file.
+	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+		printPlanUsage()
+		return nil
+	}
 	p, err := ai.LoadPlan(args[0])
 	if err != nil {
 		return err
@@ -90,11 +94,11 @@ func planShow(args []string) error {
 // ---------------------------------------------------------------------------
 
 func planRun(args []string) error {
-	fs := flag.NewFlagSet("plan run", flag.ContinueOnError)
+	fs := newFlagSet("plan run")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
 	dryRun := fs.Bool("dry-run", false, "print what would run; do not contact the daemon")
 	yes := fs.Bool("yes", false, "allow mutating tools")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	rest := fs.Args()

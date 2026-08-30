@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"flag"
 	"fmt"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -14,10 +13,10 @@ func (capabilitiesCmd) Name() string     { return "capabilities" }
 func (capabilitiesCmd) Synopsis() string { return "list per-transport capabilities advertised by ubtd" }
 
 func (capabilitiesCmd) Run(args []string, _ RootInfo) error {
-	fs := flag.NewFlagSet("capabilities", flag.ContinueOnError)
+	fs := newFlagSet("capabilities")
 	var b baseFlags
 	bindBase(fs, &b)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 

@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"flag"
 	"fmt"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -14,12 +13,12 @@ func (discoverCmd) Name() string     { return "discover" }
 func (discoverCmd) Synopsis() string { return "scan for nearby devices and stream them as they appear" }
 
 func (discoverCmd) Run(args []string, _ RootInfo) error {
-	fs := flag.NewFlagSet("discover", flag.ContinueOnError)
+	fs := newFlagSet("discover")
 	var b baseFlags
 	bindBase(fs, &b)
 	transport := fs.String("transport", "", "limit scan to one transport (e.g., rfcomm, ble)")
 	timeout := fs.Int("scan-timeout", 8, "scan duration, seconds")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 
