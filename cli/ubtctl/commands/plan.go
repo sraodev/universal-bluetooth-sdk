@@ -56,6 +56,11 @@ func planShow(args []string) error {
 	if len(args) == 0 {
 		return errors.New("plan show: missing file path")
 	}
+	// Without this, -h is opened as a filename and reported as a missing file.
+	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+		printPlanUsage()
+		return nil
+	}
 	p, err := ai.LoadPlan(args[0])
 	if err != nil {
 		return err
