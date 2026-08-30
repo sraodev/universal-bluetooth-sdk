@@ -91,7 +91,7 @@ func LoadPlan(path string) (*Plan, error) {
 
 // ReplayOptions configures plan execution.
 type ReplayOptions struct {
-	// AllowMutating must be true to execute steps tagged Mutating.
+	// AllowMutating must be true to execute tools marked Mutating by the registry.
 	// Otherwise such steps abort the run with ErrMutatingNotAllowed.
 	AllowMutating bool
 	DryRun        bool
@@ -108,22 +108,20 @@ func Replay(ctx context.Context, p *Plan, reg *tools.Registry, opts ReplayOption
 	if opts.Out == nil {
 		opts.Out = os.Stdout
 	}
-	// Pre-flight: refuse to start if any step is mutating and the
-	// caller hasn't explicitly opted in. Fail fast — don't run half a
-	// plan.
-	if !opts.AllowMutating && !opts.DryRun {
-		for _, s := range p.Steps {
-			if s.Mutating {
-				return ErrMutatingNotAllowed
-			}
-		}
-	}
-
+	// The registry is authoritative: saved plans are editable input.
+	// Validate the entire plan before executing any step.
 	for i, step := range p.Steps {
 		spec, ok := reg.Get(step.Tool)
 		if !ok {
 			return fmt.Errorf("step %d: tool %q not registered in this build", i, step.Tool)
 		}
+		if (spec.Mutating || step.Mutating) && !opts.AllowMutating && !opts.DryRun {
+			return ErrMutatingNotAllowed
+		}
+	}
+
+	for i, step := range p.Steps {
+		spec, _ := reg.Get(step.Tool) // validated during preflight
 		args := string(step.Arguments)
 		if args == "" {
 			args = "{}"
@@ -136,11 +134,10 @@ func Replay(ctx context.Context, p *Plan, reg *tools.Registry, opts ReplayOption
 		if err != nil {
 			return fmt.Errorf("step %d (%s): %w", i, step.Tool, err)
 		}
-		marker := "ok"
 		if res.IsError {
-			marker = "err"
+			return fmt.Errorf("step %d (%s): %s", i, step.Tool, res.Text)
 		}
-		fmt.Fprintf(opts.Out, "[%d] %s [%s] %s\n", i, step.Tool, marker, res.Text)
+		fmt.Fprintf(opts.Out, "[%d] %s [ok] %s\n", i, step.Tool, res.Text)
 	}
 	return nil
 }

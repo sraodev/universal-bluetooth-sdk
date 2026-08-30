@@ -1,56 +1,56 @@
-# Chat example (planned)
+# Local AI draft → review → explicit send
 
-The headline use case for the bidirectional-session work in the
-[roadmap](../../README.md#roadmap): two devices talking over RFCOMM,
-optionally piping messages through a **local** LLM (Ollama) for smart
-reply / translation / summarisation. **No internet required.**
+A small working building block for a future chat app. **This is not two-way
+Bluetooth chat.** The daemon has no receive/session API yet. This example creates
+a local text draft, which you review and can send with the existing one-shot CLI.
+It needs Python 3.10+ but no pip packages. Tests use a fake HTTP server, not an LLM.
 
-## Where it fits
+## 1. Prepare a local model
 
-This example consumes the planned `Listen` / `Reply` / `CloseSession`
-RPCs (roadmap phase 2). Because they're regular methods on `ubtd`, the
-example doesn't talk to the radio directly — it uses `ubtctl chat`,
-which is just another inbound adapter on top of the existing wire
-protocol.
+Install [Ollama](https://docs.ollama.com/quickstart), download a model suitable for
+your hardware, and run it locally. Model downloads initially require internet.
+Configure the server with `OLLAMA_NO_CLOUD=1` and restart it before using private
+text; use an installed local model shown by `ollama list`. See the
+[Ollama local-only instructions](https://docs.ollama.com/faq#how-do-i-disable-ollamas-cloud-features).
 
-```
-device A:                                    device B:
-  ubtctl chat serve   ◄─── RFCOMM ────────►   ubtctl chat connect AA:BB:...
-        │                                          │
-        ▼                                          ▼
-  ubtd (linuxrfcomm)                         ubtd (linuxrfcomm)
-        │
-        └─ optional: pipe each incoming message through Ollama for
-                     translation / smart-reply / summary
-```
+The example connects only to `127.0.0.1:11434/api/generate`, disables streaming,
+and has no tools, shell execution, radio code, or auto-send. A loopback URL alone
+does not prove the server avoids cloud services; you control that server setup.
 
-## Anticipated CLI shape
+## 2. Draft and review
+
+From the repository root, replace `YOUR_LOCAL_MODEL` with its exact installed name:
 
 ```bash
-# Serve side
-ubtctl chat serve --channel 22 \
-                  --name "MyChat" \
-                  --ai ollama://llama3.2 \
-                  --suggest
-
-# Client side
-ubtctl chat connect AA:BB:CC:DD:EE:01 --channel 22
-
-# Inside the chat TUI:
-#   /summarize         summarise the last 50 messages
-#   /translate fr      auto-translate incoming messages
-#   /suggest           propose 3 replies, pick with arrow keys
-#   /smart-reply on    auto-respond when away (explicit opt-in)
+python3 examples/chat/local_draft.py --model YOUR_LOCAL_MODEL \
+  --output draft.txt 'Write a short message asking where we should meet.'
+cat draft.txt
 ```
 
-## Required upstream pieces
+The output file is created privately and is never overwritten. Keep drafts out of
+Git. The helper caps prompt/response size, rejects incomplete responses and control
+characters, and fails rather than silently truncating an oversized draft. It does
+not validate the meaning or safety of the model's text. Review it yourself.
 
-- **Phase 2 of the roadmap** — `Listen` / `Reply` / `CloseSession` RPCs and the
-  `transport.Listener` interface they sit on.
-- **Phase 3 of the roadmap** — the `ubtctl chat` TUI itself.
-- A local LLM that exposes an OpenAI-compatible HTTP API. Ollama is the
-  reference choice (`http://127.0.0.1:11434/api/generate`) but the
-  adapter will be behind a `Completer` interface, so `llama.cpp`,
-  `GPT4All`, or anything else with the same shape is a drop-in.
+## 3. Send only if you choose
 
-Status: **planned**. The RFCOMM bits are the next foundation to ship.
+With the [stub quick start](../../README.md#quick-start-without-bluetooth-hardware)
+running, explicitly send the reviewed file:
+
+```bash
+./bin/ubtctl send --address AA:BB:CC:DD:EE:01 --file draft.txt
+```
+
+This simulates sending; nothing reaches another device. Real RFCOMM requires Linux,
+a compatible receiver, pairing/permissions, and its actual address/channel.
+Do not pipe model output directly into radio commands.
+
+## Test without Ollama or Bluetooth
+
+```bash
+python3 -m unittest discover -s examples/chat -p 'test_*.py' -v
+```
+
+[Chat / BLE design and prerequisites](../../docs/CHAT_AND_LOCAL_AI.md).
+The [Ollama generate API](https://docs.ollama.com/api/generate) is its native API,
+not the separate OpenAI-compatible endpoint.

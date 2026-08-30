@@ -1,0 +1,18 @@
+name: Feature proposal
+description: Propose a concrete capability or example app.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Use case and missing capability
+      description: Who needs this? Is it RFCOMM, BLE, chat, or an AI integration?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Smallest useful change and acceptance criteria
+      description: Include platform, compatibility, tests, security needs, and what is out of scope.
+    validations:
+      required: true

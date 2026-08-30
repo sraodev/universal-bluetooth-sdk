@@ -25,10 +25,10 @@ func TestParseBDAddrErrors(t *testing.T) {
 
 func TestParseBluetoothctlDevice(t *testing.T) {
 	cases := []struct {
-		in       string
-		ok       bool
-		address  string
-		name     string
+		in      string
+		ok      bool
+		address string
+		name    string
 	}{
 		{"Device AA:BB:CC:DD:EE:01 stub-pi", true, "AA:BB:CC:DD:EE:01", "stub-pi"},
 		{"Device 11:22:33:44:55:66 Pixel 7  ", true, "11:22:33:44:55:66", "Pixel 7"},

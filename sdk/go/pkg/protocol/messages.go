@@ -26,13 +26,13 @@ const (
 )
 
 const (
-	CodeUnknownMethod   = "unknown_method"
-	CodeNotImplemented  = "not_implemented"
-	CodeInvalidParams   = "invalid_params"
-	CodeTransportError  = "transport_error"
-	CodeNotFound        = "not_found"
-	CodeFrameTooLarge   = "frame_too_large"
-	CodeInternal        = "internal"
+	CodeUnknownMethod  = "unknown_method"
+	CodeNotImplemented = "not_implemented"
+	CodeInvalidParams  = "invalid_params"
+	CodeTransportError = "transport_error"
+	CodeNotFound       = "not_found"
+	CodeFrameTooLarge  = "frame_too_large"
+	CodeInternal       = "internal"
 )
 
 type Envelope struct {

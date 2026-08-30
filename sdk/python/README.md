@@ -1,21 +1,14 @@
-# Python SDK
+# Legacy Python RFCOMM implementation
 
-The original RFCOMM implementation that gave the project its name, kept
-as the **reference SDK** in the new architecture:
+> **Not production-ready.** Default serialization uses pickle, which can execute
+> code when receiving untrusted payloads. Use only isolated, trusted lab peers.
+> The stream framing also assumes more about read boundaries than a robust
+> transport should. See [security guidance](../../SECURITY.md).
 
-- It's the canonical place to look up "what should an RFCOMM client/server
-  *do*?" while we port behaviour to the Go daemon.
-- It's a working escape hatch on hosts where a native Go driver isn't
-  ready yet — the Go daemon could shell out to a Python SDK process to
-  exercise PyBluez paths it doesn't natively support.
-- Its tests double as protocol-conformance specs: any new Go driver that
-  claims to implement RFCOMM should pass equivalent cases.
-
-The new control plane (`ubtd`) does **not** depend on this SDK at
-runtime; it lives in its own process and only talks to drivers that
-implement the [`transport.Driver`](../go/pkg/transport/driver.go) Go
-interface. See [`/README.md`](../../README.md) for the full layered
-picture.
+This historical PyBluez client/server is separate from the Go daemon. It is not
+an automatic cross-platform fallback or a Go wire-protocol client. No Python
+bridge is implemented. Its tests cover orchestration with stubs, not hardware or
+wire conformance. Both peers must use compatible framing and serializers.
 
 ## Layout
 
@@ -27,7 +20,11 @@ picture.
   on Python 3.10+ for years).
 - `tests/` — pytest suite with transport stubs.
 
-## Quick start
+## Historical lab setup (review before running)
+
+Review the installer first: it changes system Bluetooth packages and Python setup.
+Prefer an isolated virtual environment for Python packages; do not blindly run
+the script on a workstation. This setup was not hardware-validated in this update.
 
 ```bash
 sudo ./scripts/install_dependencies.sh
@@ -42,7 +39,7 @@ Run from within `sdk/python` or adjust your `PYTHONPATH` if launching elsewhere.
 > source instead (the helper script does this for you):
 >
 > ```bash
-> sudo python3 -m pip install git+https://github.com/pybluez/pybluez.git
+> python3 -m pip install git+https://github.com/pybluez/pybluez.git
 > ```
 
 ## Tests
