@@ -91,7 +91,7 @@ class ClientSocketManager:
         if not self._socket:
             raise BluetoothServerError("Client socket not initialized")
         try:
-            self._socket.send(payload)
+            self._socket.sendall(payload)
         except (BluetoothError, OSError) as exc:
             raise BluetoothServerError("Failed to send data", cause=exc)
 
