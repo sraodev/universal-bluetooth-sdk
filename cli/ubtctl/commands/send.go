@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -31,7 +32,16 @@ func (sendCmd) Run(args []string, _ RootInfo) error {
 		return errors.New("--address is required")
 	}
 
-	payload, err := readPayload(*file, *inline)
+	fileSet, dataSet := false, false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "file":
+			fileSet = true
+		case "data":
+			dataSet = true
+		}
+	})
+	payload, err := readPayload(*file, *inline, fileSet, dataSet)
 	if err != nil {
 		return err
 	}
@@ -60,17 +70,22 @@ func (sendCmd) Run(args []string, _ RootInfo) error {
 	return nil
 }
 
-func readPayload(file, inline string) ([]byte, error) {
-	if file != "" && inline != "" {
+func readPayload(file, inline string, fileSet, dataSet bool) ([]byte, error) {
+	if fileSet && dataSet {
 		return nil, errors.New("--file and --data are mutually exclusive")
 	}
-	if inline != "" {
+	if dataSet {
 		return []byte(inline), nil
 	}
-	if file == "-" {
-		return io.ReadAll(os.Stdin)
-	}
-	if file != "" {
+	if fileSet {
+		// Set-but-empty --file "" is a deliberate zero-length payload,
+		// matching --data "". A non-empty path (including "-") is read as usual.
+		if file == "" {
+			return []byte{}, nil
+		}
+		if file == "-" {
+			return io.ReadAll(os.Stdin)
+		}
 		return os.ReadFile(file)
 	}
 	return nil, errors.New("provide --file or --data")
