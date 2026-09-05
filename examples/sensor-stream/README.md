@@ -9,11 +9,11 @@ the device writes forever, the gateway listens forever.
 
 ```
 sensor (Pi/ESP32)              gateway
-  ubtctl sensor stream    ────► ubtd (linuxrfcomm)  ──► storage adapter
+  ubt sensor stream       ────► ubtd (linuxrfcomm)  ──► storage adapter
                                       │                  (e.g. InfluxDB,
                                       │                   timescaledb,
                                       │                   sqlite, S3 parquet)
-                                      └─ optional: AI summariser via ubtctl ask
+                                      └─ optional: AI summariser via ubt ask
 ```
 
 The storage step reuses the `Storage` interface that already exists in
@@ -39,7 +39,7 @@ ships).
 
 - Phase 2 of the [roadmap](../../README.md#roadmap) — `Listen` / `Reply`.
 - Record schema in `common/message-schema/`.
-- A small `ubtctl sensor` subcommand on the device side.
+- A small `ubt sensor` subcommand on the device side.
 - A storage-adapter selection mechanism on the gateway (env var or
   flag pointing at a sink URL).
 

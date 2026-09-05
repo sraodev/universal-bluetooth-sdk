@@ -14,7 +14,7 @@ import (
 
 // Plan is the persistent record of a single AI run: goal, execution
 // mode, and the ordered list of tool calls Claude actually made.
-// Saved by `ubtctl ask --save`, replayed by `ubtctl plan run`.
+// Saved by `ubt ask --save`, replayed by `ubt plan run`.
 type Plan struct {
 	Goal      string    `json:"goal"`
 	Mode      string    `json:"mode"`

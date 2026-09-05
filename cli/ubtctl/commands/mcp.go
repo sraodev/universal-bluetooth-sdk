@@ -13,7 +13,7 @@ type mcpCmd struct{}
 
 func (mcpCmd) Name() string { return "mcp" }
 func (mcpCmd) Synopsis() string {
-	return "serve the ubtctl tool registry over MCP on stdio (for editors and agents)"
+	return "serve the Bluetooth tool registry over MCP on stdio (for editors and agents)"
 }
 
 func (mcpCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
@@ -35,7 +35,7 @@ func (mcpCmd) Run(ctx context.Context, args []string, invocation Invocation) err
 	registry := ai.BuildSpecs(c, false)
 
 	srv := mcp.New(registry, invocation.ProgramName, invocation.CLIVersion, log)
-	log.Info("ubtctl mcp serving on stdio",
+	log.Info(invocation.ProgramName+" mcp serving on stdio",
 		"socket", *socket,
 		"tools", len(registry.All()),
 		"protocol", mcp.ProtocolVersion,

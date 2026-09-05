@@ -1,6 +1,6 @@
 // Package tools is the neutral tool registry shared by every front-end
 // that drives ubtd through Claude-style tool calls — the AI planner
-// inside `ubtctl ask` today, the MCP server inside `ubtctl mcp`, and
+// inside `ubt ask` today, the MCP server inside `ubt mcp`, and
 // future agent integrations.
 //
 // One Spec → many presentations. Adapters in sibling packages translate

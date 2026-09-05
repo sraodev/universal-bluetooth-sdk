@@ -38,7 +38,7 @@ With the [stub quick start](../../README.md#quick-start-without-bluetooth-hardwa
 running, explicitly send the reviewed file:
 
 ```bash
-./bin/ubtctl send --address AA:BB:CC:DD:EE:01 --file draft.txt
+./bin/ubt send --address AA:BB:CC:DD:EE:01 --file draft.txt
 ```
 
 This simulates sending; nothing reaches another device. Real RFCOMM requires Linux,

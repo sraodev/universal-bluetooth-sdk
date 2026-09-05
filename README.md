@@ -42,6 +42,13 @@ No API key, model download, pairing, or root access is needed for the stub demo.
 git clone https://github.com/sraodev/universal-bluetooth-sdk.git
 cd universal-bluetooth-sdk
 go build -o bin/ubtd ./cli/ubtd
+go build -o bin/ubt ./cli/ubtctl
+```
+
+`ubt` is the canonical command. The same source can still be built as `ubtctl`,
+which remains a compatibility alias through all `0.x` releases:
+
+```bash
 go build -o bin/ubtctl ./cli/ubtctl
 ```
 
@@ -57,10 +64,10 @@ Terminal 2:
 
 ```bash
 export UBTD_SOCKET="$HOME/.local/run/ubtd/daemon.sock"
-./bin/ubtctl ping
-./bin/ubtctl status
-./bin/ubtctl discover --scan-timeout 3
-./bin/ubtctl send --address AA:BB:CC:DD:EE:01 --data 'hello'
+./bin/ubt ping
+./bin/ubt status
+./bin/ubt discover --scan-timeout 3
+./bin/ubt send --address AA:BB:CC:DD:EE:01 --data 'hello'
 ```
 
 Discovery returns the synthetic `stub-pi` and `stub-esp32` peers. Sending reports
@@ -82,7 +89,7 @@ the stub daemon and start `ubtd --driver linuxrfcomm` using the same private
 socket path. Send using the receiver's actual address and RFCOMM channel (1–30):
 
 ```bash
-./bin/ubtctl send --address AA:BB:CC:DD:EE:FF --port 1 --data 'hello'
+./bin/ubt send --address AA:BB:CC:DD:EE:FF --port 1 --data 'hello'
 ```
 
 The address is a placeholder. A successful write does not prove the remote app
@@ -93,14 +100,14 @@ default. See [hardware validation](docs/HARDWARE_TESTING.md) and [security](SECU
 ## AI, MCP, and replay
 
 - **Local AI:** [draft a short message with Ollama](examples/chat/README.md), review
-  the saved text, then explicitly invoke `ubtctl send`. No automatic radio access.
-- **Cloud planner:** `ubtctl ask --dry-run "check daemon status"` requires
+  the saved text, then explicitly invoke `ubt send`. No automatic radio access.
+- **Cloud planner:** `ubt ask --dry-run "check daemon status"` requires
   `ANTHROPIC_API_KEY`. It sends the goal and tool results to Anthropic and can incur
   charges. `--dry-run` suppresses sends; it does not make this an offline command.
-- **MCP:** `ubtctl mcp --socket "$UBTD_SOCKET"` exposes daemon tools over stdio to
+- **MCP:** `ubt mcp --socket "$UBTD_SOCKET"` exposes daemon tools over stdio to
   a compatible client. The current server includes a send tool; use only trusted
   clients and their approval controls, preferably against the stub driver.
-- **Replay:** `ubtctl plan run --dry-run plan.json` previews a saved trace without
+- **Replay:** `ubt plan run --dry-run plan.json` previews a saved trace without
   the daemon or an LLM. Executing mutating tools requires `--yes` before the path.
 
 The cloud planner's `ask` command currently has **no `--yes` confirmation flag**:

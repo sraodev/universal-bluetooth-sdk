@@ -1,4 +1,4 @@
-// Package commands defines the typed ubtctl command tree.
+// Package commands defines the typed Universal Bluetooth CLI command tree.
 //
 // The command registry is the presentation layer used by the CLI dispatcher.
 // The AI planner and MCP server use their own shared tool registry in tools.
@@ -125,5 +125,10 @@ func (r *Registry) PrintUsage(w io.Writer, invocation Invocation, path []string)
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Flags common to all commands:")
 		fmt.Fprintln(w, "  --socket <path>   override ubtd socket path (env UBTD_SOCKET)")
+		if invocation.ProgramName == "ubtctl" {
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "Compatibility:")
+			fmt.Fprintln(w, "  ubtctl is a legacy alias supported through 0.x; use ubt for new scripts.")
+		}
 	}
 }

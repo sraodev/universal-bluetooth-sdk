@@ -13,7 +13,7 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/protocol"
 )
 
-// BuildSpecs returns the tool registry ubtctl exposes to any tool-using
+// BuildSpecs returns the tool registry ubt exposes to any tool-using
 // front-end (the Anthropic planner, the MCP server, etc).
 //
 // Every spec funnels through `c` — the same daemon client a typed CLI

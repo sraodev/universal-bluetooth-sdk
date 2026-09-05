@@ -1,4 +1,4 @@
-// Package protocol defines the wire types shared by ubtd and ubtctl.
+// Package protocol defines the wire types shared by ubtd and ubt.
 //
 // The schema is mirrored in common/protocol/v1.proto. Keep them in sync.
 package protocol

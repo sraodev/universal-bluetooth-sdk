@@ -2,7 +2,7 @@
 //
 // It listens on a Unix domain socket, multiplexes typed requests onto
 // platform-specific transport drivers, and is the only process that
-// touches the Bluetooth stack directly. Both the typed CLI (ubtctl) and
+// touches the Bluetooth stack directly. Both the typed CLI (ubt) and
 // the AI planner speak to it through the wire format documented in
 // common/protocol/framing.md.
 package main

@@ -13,7 +13,7 @@ remote client ── gRPC ──►  microservices/grpc-server  ── UDS ─�
 ```
 
 The microservice is **another inbound adapter**. It does not reach into
-hardware; it reaches into `ubtd` exactly the way `ubtctl` does today.
+hardware; it reaches into `ubtd` exactly the way `ubt` does today.
 
 ## When this ships
 

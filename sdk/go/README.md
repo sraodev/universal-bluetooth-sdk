@@ -1,6 +1,6 @@
 # Go SDK
 
-Shared Go packages consumed by `ubtd` (the daemon binary) and `ubtctl`
+Shared Go packages consumed by `ubtd` (the daemon binary) and `ubt`
 (the CLI binary). This is the **outbound side of the hexagon**: the
 `Driver` interface defined here is the port through which the daemon
 talks to whatever Bluetooth stack the host provides.
