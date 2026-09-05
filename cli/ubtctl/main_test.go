@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -18,37 +19,86 @@ func TestExecutableArguments(t *testing.T) {
 		t.Skipf("Go tool unavailable: %v", err)
 	}
 
-	binary := filepath.Join(t.TempDir(), "ubtctl")
-	build := exec.Command(goTool, "build", "-o", binary, ".")
+	dir := t.TempDir()
+	canonical := filepath.Join(dir, "ubt")
+	build := exec.Command(goTool, "build", "-o", canonical, ".")
 	if output, err := build.CombinedOutput(); err != nil {
-		t.Skipf("cannot build ubtctl: %v\n%s", err, output)
+		t.Skipf("cannot build ubt: %v\n%s", err, output)
 	}
 
 	t.Setenv("UBTD_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
 	tests := []struct {
-		name     string
-		args     []string
-		wantCode int
+		binary         string
+		wantName       string
+		wantLegacyNote bool
 	}{
-		{name: "help succeeds", args: []string{"--help"}, wantCode: 0},
-		{name: "unknown command fails", args: []string{"nonexistent-cmd"}, wantCode: 2},
+		{binary: "ubt", wantName: "ubt"},
+		{binary: "ubtctl", wantName: "ubtctl", wantLegacyNote: true},
+		{binary: "temporary-test-binary", wantName: "ubt"},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			output, err := exec.Command(binary, tc.args...).CombinedOutput()
-			gotCode := 0
-			if err != nil {
-				var exitErr *exec.ExitError
-				if !errors.As(err, &exitErr) {
-					t.Fatalf("run ubtctl: %v", err)
+		t.Run(tc.binary, func(t *testing.T) {
+			binary := filepath.Join(dir, tc.binary)
+			if binary != canonical {
+				if err := os.Link(canonical, binary); err != nil {
+					t.Fatal(err)
 				}
-				gotCode = exitErr.ExitCode()
 			}
-			if gotCode != tc.wantCode {
-				t.Fatalf("ubtctl %v exit code = %d, want %d\n%s", tc.args, gotCode, tc.wantCode, output)
+
+			code, stdout, stderr := runExecutable(t, binary, "--help")
+			if code != 0 || stderr != "" {
+				t.Fatalf("%s --help: code=%d stdout=%q stderr=%q", tc.binary, code, stdout, stderr)
+			}
+			if !strings.Contains(stdout, "  "+tc.wantName+" <command> [flags]") {
+				t.Fatalf("%s --help does not present as %q:\n%s", tc.binary, tc.wantName, stdout)
+			}
+			if got := strings.Contains(stdout, "legacy alias supported through 0.x"); got != tc.wantLegacyNote {
+				t.Fatalf("%s legacy note = %v; want %v", tc.binary, got, tc.wantLegacyNote)
+			}
+
+			code, _, stderr = runExecutable(t, binary, "nonexistent-cmd")
+			if code != 2 || !strings.Contains(stderr, tc.wantName+`: unknown command "nonexistent-cmd"`) {
+				t.Fatalf("%s unknown command: code=%d stderr=%q", tc.binary, code, stderr)
+			}
+
+			code, stdout, stderr = runExecutable(t, binary, "version", "--client-only")
+			if code != 0 || stderr != "" || !strings.HasPrefix(stdout, tc.wantName+"   ") {
+				t.Fatalf("%s version: code=%d stdout=%q stderr=%q", tc.binary, code, stdout, stderr)
 			}
 		})
+	}
+}
+
+func runExecutable(t *testing.T, binary string, args ...string) (code int, stdout, stderr string) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	command := exec.Command(binary, args...)
+	command.Stdout = &out
+	command.Stderr = &errOut
+	err := command.Run()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("run %s: %v", binary, err)
+		}
+		code = exitErr.ExitCode()
+	}
+	return code, out.String(), errOut.String()
+}
+
+func TestProgramName(t *testing.T) {
+	tests := map[string]string{
+		"/usr/local/bin/ubt":       "ubt",
+		"/usr/local/bin/ubtctl":    "ubtctl",
+		"/tmp/copied-test-program": "ubt",
+		"ubtctl.exe":               "ubtctl",
+		"UBTCTL.EXE":               "ubtctl",
+	}
+	for input, want := range tests {
+		if got := programName(input); got != want {
+			t.Errorf("programName(%q) = %q; want %q", input, got, want)
+		}
 	}
 }
 

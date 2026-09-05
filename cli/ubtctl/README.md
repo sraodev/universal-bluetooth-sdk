@@ -1,7 +1,11 @@
-# ubtctl and ubtd
+# ubt and ubtd
 
 Build from the repository root using the [quick start](../../README.md#quick-start-without-bluetooth-hardware).
-`ubtd` loads one driver; `ubtctl` calls it through a local Unix socket.
+`ubtd` loads one driver; `ubt` calls it through a local Unix socket.
+
+`ubtctl` remains a compatibility alias through all `0.x` releases. Both names
+use this directory as their source and expose the same commands. Use `ubt` in
+new scripts and configuration.
 
 | Command | Purpose |
 |---|---|
@@ -13,16 +17,16 @@ Build from the repository root using the [quick start](../../README.md#quick-sta
 | `plan show FILE` | Inspect a recorded tool trace |
 | `plan run [flags] FILE` | Replay without an LLM |
 
-Flags must come **before positional arguments**. Use `ubtctl COMMAND -h`.
+Flags must come **before positional arguments**. Use `ubt COMMAND -h`.
 
 ## Planner
 
 ```bash
 # Assumes ANTHROPIC_API_KEY was set securely outside this command.
-./bin/ubtctl ask --dry-run --save /tmp/check.plan.json \
+./bin/ubt ask --dry-run --save /tmp/check.plan.json \
   "check daemon status and list known devices"
-./bin/ubtctl plan show /tmp/check.plan.json
-./bin/ubtctl plan run --dry-run /tmp/check.plan.json
+./bin/ubt plan show /tmp/check.plan.json
+./bin/ubt plan run --dry-run /tmp/check.plan.json
 ```
 
 The implementation defaults to `claude-opus-4-7`; `--model` accepts an override.
@@ -39,7 +43,7 @@ needs neither a running daemon nor credentials. Keep saved plans private.
 
 ## MCP
 
-Launch `./bin/ubtctl mcp --socket "$UBTD_SOCKET"` from a compatible client.
+Launch `./bin/ubt mcp --socket "$UBTD_SOCKET"` from a compatible client.
 The server implements revision `2025-03-26` with `initialize`, `ping`,
 `tools/list`, and `tools/call`. This is a limited implementation, not an MCP
 conformance certification. Tools are `ping_daemon`, `get_status`,
@@ -50,8 +54,8 @@ Use an absolute executable and socket path in your client's configuration:
 ```json
 {
   "mcpServers": {
-    "ubtctl": {
-      "command": "/absolute/path/to/bin/ubtctl",
+    "ubt": {
+      "command": "/absolute/path/to/bin/ubt",
       "args": ["mcp", "--socket", "/absolute/private/path/daemon.sock"]
     }
   }

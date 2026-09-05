@@ -1,6 +1,6 @@
 # Wire framing — v1
 
-The control-plane connection between `ubtctl` and `ubtd` is a length-prefixed
+The control-plane connection between `ubt` and `ubtd` is a length-prefixed
 stream of JSON envelopes over a local Unix domain socket. TCP and gRPC servers
 are not implemented. The Go types are the implemented schema; `v1.proto` is a
 design counterpart and does not generate the current JSON bindings.

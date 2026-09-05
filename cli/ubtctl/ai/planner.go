@@ -21,13 +21,14 @@ const DefaultModel = "claude-opus-4-7"
 
 // RunConfig configures one planner run.
 type RunConfig struct {
-	Goal       string
-	Model      string // empty → DefaultModel
-	MaxTokens  int64
-	DryRun     bool
-	SocketPath string
-	Daemon     *client.Client
-	Out        io.Writer
+	ProgramName string
+	Goal        string
+	Model       string // empty → DefaultModel
+	MaxTokens   int64
+	DryRun      bool
+	SocketPath  string
+	Daemon      *client.Client
+	Out         io.Writer
 	// SavePath, if non-empty, captures every tool call into a Plan
 	// and writes it to disk after the run completes.
 	SavePath string
@@ -43,6 +44,9 @@ func Run(ctx context.Context, p RunConfig) error {
 	}
 	if p.Out == nil {
 		p.Out = os.Stdout
+	}
+	if p.ProgramName == "" {
+		p.ProgramName = "ubt"
 	}
 	if p.Model == "" {
 		p.Model = DefaultModel
@@ -70,7 +74,7 @@ func Run(ctx context.Context, p RunConfig) error {
 	}
 
 	system := []anthropic.BetaTextBlockParam{{
-		Text: SystemPrompt(p.SocketPath, p.DryRun),
+		Text: SystemPromptFor(p.ProgramName, p.SocketPath, p.DryRun),
 		// Cache the system prompt + tool list — both are stable per
 		// binary, so subsequent invocations read the prefix instead
 		// of paying for it. See shared/prompt-caching.md.

@@ -16,7 +16,7 @@ func TestServeKeepsStdoutMachineReadable(t *testing.T) {
 	var protocolOut, logs bytes.Buffer
 	server := New(
 		tools.NewRegistry(),
-		"ubtctl",
+		"ubt",
 		"test",
 		slog.New(slog.NewTextHandler(&logs, nil)),
 	)

@@ -20,7 +20,7 @@ Empty today. Schemas land here as the corresponding examples ship:
 ## Where this fits in the architecture
 
 ```
-ubtctl ──► ubtd ──► driver ──► RFCOMM peer
+ubt ──► ubtd ──► driver ──► RFCOMM peer
             │
             └─ Send.payload   = bytes
                               = JSON / proto encoded against a common/message-schema/* doc

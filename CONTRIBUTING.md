@@ -21,7 +21,8 @@ go test -race ./...
 go vet ./...
 test -z "$(gofmt -l cli sdk/go)"
 go build -o bin/ubtd ./cli/ubtd
-go build -o bin/ubtctl ./cli/ubtctl
+go build -o bin/ubt ./cli/ubtctl
+go build -o bin/ubtctl ./cli/ubtctl # 0.x compatibility alias
 python3 scripts/smoke.py
 python3 -m unittest discover -s examples/chat -p 'test_*.py' -v
 ```

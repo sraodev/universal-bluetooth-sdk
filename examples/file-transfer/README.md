@@ -16,10 +16,10 @@ both sides agree on framing.
 
 ```bash
 # Receiver
-ubtctl file recv --channel 24 --output ./inbox/
+ubt file recv --channel 24 --output ./inbox/
 
 # Sender
-ubtctl file send --address AA:BB:CC:DD:EE:01 --channel 24 firmware.bin
+ubt file send --address AA:BB:CC:DD:EE:01 --channel 24 firmware.bin
 ```
 
 ## Anticipated chunk shape

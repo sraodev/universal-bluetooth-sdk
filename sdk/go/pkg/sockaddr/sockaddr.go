@@ -1,6 +1,6 @@
 // Package sockaddr resolves the default Unix socket path for the daemon.
 //
-// Centralised so ubtd and ubtctl can never disagree.
+// Centralised so ubtd and ubt can never disagree.
 package sockaddr
 
 import (
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-// Default returns the path ubtd listens on (and ubtctl dials) by default.
+// Default returns the path ubtd listens on (and ubt dials) by default.
 //
 //   - Honour UBTD_SOCKET if set.
 //   - Otherwise prefer $XDG_RUNTIME_DIR/ubtd.sock (per-user, tmpfs).

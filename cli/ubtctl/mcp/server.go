@@ -1,10 +1,10 @@
-// Package mcp serves ubtctl's tool registry over the Model Context Protocol
+// Package mcp serves ubt's tool registry over the Model Context Protocol
 // (https://modelcontextprotocol.io/). The wire format is JSON-RPC 2.0 over
 // stdio with newline-delimited JSON, matching how MCP-aware editors and
 // agents (Claude Desktop, Cursor, Zed, etc.) launch their servers.
 //
 // Every tool a client sees here is the same tools.Spec the in-process AI
-// planner (`ubtctl ask`) uses — there is one source of truth and one
+// planner (`ubt ask`) uses — there is one source of truth and one
 // execution path.
 package mcp
 

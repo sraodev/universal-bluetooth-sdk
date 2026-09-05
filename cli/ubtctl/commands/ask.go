@@ -37,12 +37,13 @@ func (askCmd) Run(ctx context.Context, args []string, invocation Invocation) err
 	defer c.Close()
 
 	return ai.Run(ctx, ai.RunConfig{
-		Goal:       goal,
-		Model:      *model,
-		DryRun:     *dryRun,
-		SocketPath: *socket,
-		Daemon:     c,
-		Out:        invocation.Out,
-		SavePath:   *save,
+		ProgramName: invocation.ProgramName,
+		Goal:        goal,
+		Model:       *model,
+		DryRun:      *dryRun,
+		SocketPath:  *socket,
+		Daemon:      c,
+		Out:         invocation.Out,
+		SavePath:    *save,
 	})
 }
