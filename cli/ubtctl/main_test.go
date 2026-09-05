@@ -1,14 +1,56 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/commands"
 )
+
+func TestExecutableArguments(t *testing.T) {
+	goTool, err := exec.LookPath("go")
+	if err != nil {
+		t.Skipf("Go tool unavailable: %v", err)
+	}
+
+	binary := filepath.Join(t.TempDir(), "ubtctl")
+	build := exec.Command(goTool, "build", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Skipf("cannot build ubtctl: %v\n%s", err, output)
+	}
+
+	t.Setenv("UBTD_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	tests := []struct {
+		name     string
+		args     []string
+		wantCode int
+	}{
+		{name: "help succeeds", args: []string{"--help"}, wantCode: 0},
+		{name: "unknown command fails", args: []string{"nonexistent-cmd"}, wantCode: 2},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := exec.Command(binary, tc.args...).CombinedOutput()
+			gotCode := 0
+			if err != nil {
+				var exitErr *exec.ExitError
+				if !errors.As(err, &exitErr) {
+					t.Fatalf("run ubtctl: %v", err)
+				}
+				gotCode = exitErr.ExitCode()
+			}
+			if gotCode != tc.wantCode {
+				t.Fatalf("ubtctl %v exit code = %d, want %d\n%s", tc.args, gotCode, tc.wantCode, output)
+			}
+		})
+	}
+}
 
 // capture runs the CLI with os.Stdout and os.Stderr redirected. The command
 // packages print through the real files, so swapping them is what lets the
