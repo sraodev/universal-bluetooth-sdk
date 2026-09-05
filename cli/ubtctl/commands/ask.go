@@ -2,11 +2,8 @@ package commands
 
 import (
 	"context"
-	"errors"
-	"os"
-	"os/signal"
+	"fmt"
 	"strings"
-	"syscall"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/ai"
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -19,30 +16,25 @@ func (askCmd) Synopsis() string {
 	return "natural-language goal → AI planner → tool calls against ubtd"
 }
 
-func (askCmd) Run(args []string, _ RootInfo) error {
-	fs := newFlagSet("ask")
+func (askCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "ask")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
 	dryRun := fs.Bool("dry-run", false, "skip mutating tool calls; the model still plans and reads, but Send is stubbed")
 	model := fs.String("model", "", "override the Claude model (default claude-opus-4-7)")
-	save := fs.String("save", "", "write the recorded tool-call plan to FILE (replay later with: ubtctl plan run FILE)")
-	if err := parseFlags(fs, args); err != nil {
+	save := fs.String("save", "", fmt.Sprintf("write the recorded tool-call plan to FILE (replay later with: %s plan run FILE)", invocation.ProgramName))
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
 		return err
 	}
 	goal := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if goal == "" {
-		return errors.New("provide a goal, e.g.: ubtctl ask 'is the daemon healthy?'")
+		return usageError(fmt.Errorf("provide a goal, e.g.: %s ask 'is the daemon healthy?'", invocation.ProgramName))
 	}
 
-	c, err := client.Dial(*socket)
+	c, err := client.Dial(ctx, *socket)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
-
-	// `ask` runs the agentic loop; tool-call deadlines are enforced
-	// inside the daemon. The outer context only carries signal cancellation.
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 
 	return ai.Run(ctx, ai.RunConfig{
 		Goal:       goal,
@@ -50,9 +42,7 @@ func (askCmd) Run(args []string, _ RootInfo) error {
 		DryRun:     *dryRun,
 		SocketPath: *socket,
 		Daemon:     c,
-		Out:        os.Stdout,
+		Out:        invocation.Out,
 		SavePath:   *save,
 	})
 }
-
-func init() { register(askCmd{}) }

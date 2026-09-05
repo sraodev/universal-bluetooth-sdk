@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"unicode/utf8"
 
@@ -12,119 +11,105 @@ import (
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
 )
 
-type planCmd struct{}
+type planCmd struct {
+	subcommands *Registry
+}
 
 func (planCmd) Name() string     { return "plan" }
 func (planCmd) Synopsis() string { return "show / replay a saved AI plan (no LLM)" }
-
-func (planCmd) Run(args []string, _ RootInfo) error {
-	if len(args) == 0 {
-		printPlanUsage()
-		return errors.New("plan: missing subcommand")
-	}
-	switch args[0] {
-	case "-h", "--help", "help":
-		printPlanUsage()
-		return nil
-	case "show":
-		return planShow(args[1:])
-	case "run":
-		return planRun(args[1:])
-	default:
-		printPlanUsage()
-		return fmt.Errorf("plan: unknown subcommand %q", args[0])
-	}
+func (c planCmd) Subcommands() *Registry {
+	return c.subcommands
+}
+func (planCmd) Run(context.Context, []string, Invocation) error {
+	return usageError(errors.New("missing command"))
 }
 
-func init() { register(planCmd{}) }
+type planShowCmd struct{}
 
-func printPlanUsage() {
-	fmt.Println(`Usage:
-  ubtctl plan show <file>            print a saved plan as a human-readable summary
-  ubtctl plan run  [flags] <file>    re-execute a saved plan against ubtd (no LLM)
-
-plan run flags:
-  --socket <path>   override ubtd socket path (env UBTD_SOCKET)
-  --dry-run         print what would run; do not contact the daemon
-  --yes             allow mutating tools (otherwise plan run aborts)`)
+func (planShowCmd) Name() string     { return "show" }
+func (planShowCmd) Synopsis() string { return "print a saved plan as a human-readable summary" }
+func (planShowCmd) Run(_ context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "plan show")
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage:\n  %s plan show <file>\n", invocation.ProgramName)
+	}
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 1 {
+		return usageError(errors.New("provide one file path"))
+	}
+	return planShow(fs.Args()[0], invocation)
 }
 
-// ---------------------------------------------------------------------------
-// plan show
-// ---------------------------------------------------------------------------
-
-func planShow(args []string) error {
-	if len(args) == 0 {
-		return errors.New("plan show: missing file path")
-	}
-	// Without this, -h is opened as a filename and reported as a missing file.
-	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
-		printPlanUsage()
-		return nil
-	}
-	p, err := ai.LoadPlan(args[0])
+func planShow(path string, invocation Invocation) error {
+	p, err := ai.LoadPlan(path)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("goal:    %s\n", p.Goal)
-	fmt.Printf("mode:    %s\n", p.Mode)
+	fmt.Fprintf(invocation.Out, "goal:    %s\n", p.Goal)
+	fmt.Fprintf(invocation.Out, "mode:    %s\n", p.Mode)
 	if p.Model != "" {
-		fmt.Printf("model:   %s\n", p.Model)
+		fmt.Fprintf(invocation.Out, "model:   %s\n", p.Model)
 	}
-	fmt.Printf("created: %s\n", p.CreatedAt.Local().Format("2006-01-02 15:04:05"))
-	fmt.Printf("steps:   %d\n\n", len(p.Steps))
-	for i, s := range p.Steps {
-		flag := ""
-		if s.Mutating {
-			flag = " [mutating]"
+	fmt.Fprintf(invocation.Out, "created: %s\n", p.CreatedAt.Local().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(invocation.Out, "steps:   %d\n\n", len(p.Steps))
+	for i, step := range p.Steps {
+		mutating := ""
+		if step.Mutating {
+			mutating = " [mutating]"
 		}
-		args := strings.TrimSpace(string(s.Arguments))
-		if args == "" {
-			args = "{}"
+		arguments := strings.TrimSpace(string(step.Arguments))
+		if arguments == "" {
+			arguments = "{}"
 		}
-		fmt.Printf("[%d] %s%s\n      args: %s\n", i, s.Tool, flag, args)
-		if s.Result != "" {
-			fmt.Printf("      result: %s\n", trim(s.Result, 240))
+		fmt.Fprintf(invocation.Out, "[%d] %s%s\n      args: %s\n", i, step.Tool, mutating, arguments)
+		if step.Result != "" {
+			fmt.Fprintf(invocation.Out, "      result: %s\n", trim(step.Result, 240))
 		}
 	}
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// plan run
-// ---------------------------------------------------------------------------
+type planRunCmd struct{}
 
-func planRun(args []string) error {
-	fs := newFlagSet("plan run")
+func (planRunCmd) Name() string     { return "run" }
+func (planRunCmd) Synopsis() string { return "re-execute a saved plan against ubtd (no LLM)" }
+func (planRunCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "plan run")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
 	dryRun := fs.Bool("dry-run", false, "print what would run; do not contact the daemon")
 	yes := fs.Bool("yes", false, "allow mutating tools")
-	if err := parseFlags(fs, args); err != nil {
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage:\n  %s plan run [flags] <file>\n\nFlags:\n", invocation.ProgramName)
+		fs.PrintDefaults()
+	}
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
 		return err
 	}
 	rest := fs.Args()
 	if len(rest) != 1 {
-		return errors.New("plan run: provide one file path; flags must precede the path")
+		return usageError(errors.New("provide one file path; flags must precede the path"))
 	}
 	p, err := ai.LoadPlan(rest[0])
 	if err != nil {
 		return err
 	}
 
-	var c *client.Client
+	var daemon *client.Client
 	if !*dryRun {
-		c, err = client.Dial(*socket)
+		daemon, err = client.Dial(ctx, *socket)
 		if err != nil {
 			return err
 		}
-		defer c.Close()
+		defer daemon.Close()
 	}
 
-	registry := ai.BuildSpecs(c, false)
-	return ai.Replay(context.Background(), p, registry, ai.ReplayOptions{
+	registry := ai.BuildSpecs(daemon, false)
+	return ai.Replay(ctx, p, registry, ai.ReplayOptions{
 		AllowMutating: *yes,
 		DryRun:        *dryRun,
-		Out:           os.Stdout,
+		Out:           invocation.Out,
 	})
 }
 

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,8 +17,8 @@ type sendCmd struct{}
 func (sendCmd) Name() string     { return "send" }
 func (sendCmd) Synopsis() string { return "send a payload to a peer (file, stdin, or --data)" }
 
-func (sendCmd) Run(args []string, _ RootInfo) error {
-	fs := newFlagSet("send")
+func (sendCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "send")
 	var b baseFlags
 	bindBase(fs, &b)
 	address := fs.String("address", "", "peer address (required)")
@@ -25,11 +26,11 @@ func (sendCmd) Run(args []string, _ RootInfo) error {
 	port := fs.Int("port", 0, "RFCOMM channel / GATT handle (0 = driver default)")
 	file := fs.String("file", "", "read payload from file ('-' for stdin)")
 	inline := fs.String("data", "", "inline payload string (mutually exclusive with --file)")
-	if err := parseFlags(fs, args); err != nil {
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
 		return err
 	}
 	if *address == "" {
-		return errors.New("--address is required")
+		return usageError(errors.New("--address is required"))
 	}
 
 	fileSet, dataSet := false, false
@@ -41,12 +42,12 @@ func (sendCmd) Run(args []string, _ RootInfo) error {
 			dataSet = true
 		}
 	})
-	payload, err := readPayload(*file, *inline, fileSet, dataSet)
+	payload, err := readPayload(invocation.In, *file, *inline, fileSet, dataSet)
 	if err != nil {
-		return err
+		return usageError(err)
 	}
 
-	c, ctx, cancel, err := dial(b)
+	c, ctx, cancel, err := dial(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -62,15 +63,15 @@ func (sendCmd) Run(args []string, _ RootInfo) error {
 	if err != nil {
 		return err
 	}
-	var r protocol.SendResult
-	if err := client.Decode(res, &r); err != nil {
+	var result protocol.SendResult
+	if err := client.Decode(res, &result); err != nil {
 		return err
 	}
-	fmt.Printf("sent %d bytes in %d µs\n", r.BytesSent, r.LatencyMicros)
+	fmt.Fprintf(invocation.Out, "sent %d bytes in %d µs\n", result.BytesSent, result.LatencyMicros)
 	return nil
 }
 
-func readPayload(file, inline string, fileSet, dataSet bool) ([]byte, error) {
+func readPayload(in io.Reader, file, inline string, fileSet, dataSet bool) ([]byte, error) {
 	if fileSet && dataSet {
 		return nil, errors.New("--file and --data are mutually exclusive")
 	}
@@ -84,11 +85,9 @@ func readPayload(file, inline string, fileSet, dataSet bool) ([]byte, error) {
 			return []byte{}, nil
 		}
 		if file == "-" {
-			return io.ReadAll(os.Stdin)
+			return io.ReadAll(in)
 		}
 		return os.ReadFile(file)
 	}
 	return nil, errors.New("provide --file or --data")
 }
-
-func init() { register(sendCmd{}) }

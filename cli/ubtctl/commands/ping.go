@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -13,15 +14,15 @@ type pingCmd struct{}
 func (pingCmd) Name() string     { return "ping" }
 func (pingCmd) Synopsis() string { return "round-trip a Ping request to ubtd (clock skew + liveness)" }
 
-func (pingCmd) Run(args []string, _ RootInfo) error {
-	fs := newFlagSet("ping")
+func (pingCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "ping")
 	var b baseFlags
 	bindBase(fs, &b)
-	if err := parseFlags(fs, args); err != nil {
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
 		return err
 	}
 
-	c, ctx, cancel, err := dial(b)
+	c, ctx, cancel, err := dial(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -40,8 +41,6 @@ func (pingCmd) Run(args []string, _ RootInfo) error {
 		return err
 	}
 	skew := time.Now().UnixMilli() - p.ServerTimeUnixMs
-	fmt.Printf("%s  rtt=%s  clock-skew=%d ms\n", p.Pong, rtt, skew)
+	fmt.Fprintf(invocation.Out, "%s  rtt=%s  clock-skew=%d ms\n", p.Pong, rtt, skew)
 	return nil
 }
-
-func init() { register(pingCmd{}) }

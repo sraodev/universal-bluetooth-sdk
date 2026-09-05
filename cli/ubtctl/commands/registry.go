@@ -1,61 +1,129 @@
-// Package commands hosts the ubtctl subcommand registry.
+// Package commands defines the typed ubtctl command tree.
 //
-// Each subcommand is a small struct implementing Command. Keeping the
-// registry typed (rather than hand-rolled string switches scattered
-// across main) is what lets the AI planner enumerate the surface and
-// generate tool schemas mechanically.
+// The command registry is the presentation layer used by the CLI dispatcher.
+// The AI planner and MCP server use their own shared tool registry in tools.
 package commands
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
 )
 
-type RootInfo struct {
-	CLIVersion string
+// Invocation contains the process-level dependencies shared by commands.
+type Invocation struct {
+	ProgramName string
+	CLIVersion  string
+	In          io.Reader
+	Out         io.Writer
+	ErrOut      io.Writer
 }
 
 type Command interface {
 	Name() string
 	Synopsis() string
-	Run(args []string, info RootInfo) error
+	Run(context.Context, []string, Invocation) error
 }
 
-var registry = map[string]Command{}
-
-func register(c Command) {
-	registry[c.Name()] = c
+// Group is a command whose children are dispatched by the root application.
+type Group interface {
+	Command
+	Subcommands() *Registry
 }
 
-func Lookup(name string) (Command, bool) {
-	c, ok := registry[name]
-	return c, ok
+// UsageError marks invalid command-line input. The application maps it to exit 2.
+type UsageError struct {
+	Err error
 }
 
-// PrintRootUsage writes the command list to w. The caller picks the stream:
-// stdout when the user asked for help, stderr when usage accompanies an error.
-func PrintRootUsage(w io.Writer, version string) {
-	fmt.Fprintf(w, "ubtctl %s — Universal Bluetooth CLI\n\n", version)
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  ubtctl <command> [flags]")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Commands:")
-	names := Names()
-	for _, n := range names {
-		fmt.Fprintf(w, "  %-12s %s\n", n, registry[n].Synopsis())
+func (e *UsageError) Error() string { return e.Err.Error() }
+func (e *UsageError) Unwrap() error { return e.Err }
+
+func usageError(err error) error {
+	if err == nil {
+		return nil
 	}
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Flags common to all commands:")
-	fmt.Fprintln(w, "  --socket <path>   override ubtd socket path (env UBTD_SOCKET)")
+	return &UsageError{Err: err}
 }
 
-// Names returns the registered command names in sorted order.
-func Names() []string {
-	names := make([]string, 0, len(registry))
-	for n := range registry {
-		names = append(names, n)
+// Registry is an immutable command lookup table after construction.
+type Registry struct {
+	commands map[string]Command
+}
+
+// NewRegistry validates and registers commands explicitly.
+func NewRegistry(commands ...Command) (*Registry, error) {
+	registry := &Registry{commands: make(map[string]Command, len(commands))}
+	for _, command := range commands {
+		if command == nil {
+			return nil, errors.New("register command: nil command")
+		}
+		name := command.Name()
+		if name == "" {
+			return nil, errors.New("register command: empty name")
+		}
+		if _, exists := registry.commands[name]; exists {
+			return nil, fmt.Errorf("register command %q: duplicate name", name)
+		}
+		registry.commands[name] = command
+	}
+	return registry, nil
+}
+
+// NewDefaultRegistry constructs the complete CLI command tree.
+func NewDefaultRegistry() (*Registry, error) {
+	planCommands, err := NewRegistry(planShowCmd{}, planRunCmd{})
+	if err != nil {
+		return nil, fmt.Errorf("register plan commands: %w", err)
+	}
+	return NewRegistry(
+		askCmd{},
+		capabilitiesCmd{},
+		discoverCmd{},
+		mcpCmd{},
+		pingCmd{},
+		planCmd{subcommands: planCommands},
+		sendCmd{},
+		statusCmd{},
+		versionCmd{},
+	)
+}
+
+func (r *Registry) Lookup(name string) (Command, bool) {
+	command, ok := r.commands[name]
+	return command, ok
+}
+
+// Names returns registered command names in sorted order.
+func (r *Registry) Names() []string {
+	names := make([]string, 0, len(r.commands))
+	for name := range r.commands {
+		names = append(names, name)
 	}
 	sort.Strings(names)
 	return names
+}
+
+// PrintUsage writes usage for the registry at path.
+func (r *Registry) PrintUsage(w io.Writer, invocation Invocation, path []string) {
+	if len(path) == 0 {
+		fmt.Fprintf(w, "%s %s — Universal Bluetooth CLI\n\n", invocation.ProgramName, invocation.CLIVersion)
+	}
+	fullPath := invocation.ProgramName
+	for _, part := range path {
+		fullPath += " " + part
+	}
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintf(w, "  %s <command> [flags]\n\n", fullPath)
+	fmt.Fprintln(w, "Commands:")
+	for _, name := range r.Names() {
+		fmt.Fprintf(w, "  %-12s %s\n", name, r.commands[name].Synopsis())
+	}
+	if len(path) == 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Flags common to all commands:")
+		fmt.Fprintln(w, "  --socket <path>   override ubtd socket path (env UBTD_SOCKET)")
+	}
 }
