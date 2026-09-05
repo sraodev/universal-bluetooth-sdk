@@ -114,7 +114,7 @@ class SocketManager:
     def send(self, payload: str | bytes) -> None:
         try:
             buffer = payload.encode("utf-8") if isinstance(payload, str) else payload
-            self.client_socket.send(buffer)
+            self.client_socket.sendall(buffer)
         except (BluetoothError, OSError) as exc:
             raise BluetoothServerError("Unable to send data", cause=exc)
 
