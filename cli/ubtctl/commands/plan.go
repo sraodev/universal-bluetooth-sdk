@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/ai"
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -127,9 +128,13 @@ func planRun(args []string) error {
 	})
 }
 
+// trim keeps at most n bytes of valid UTF-8 text, then appends an ellipsis if truncated.
 func trim(s string, n int) string {
 	if len(s) <= n {
 		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
 	}
 	return s[:n] + "…"
 }
