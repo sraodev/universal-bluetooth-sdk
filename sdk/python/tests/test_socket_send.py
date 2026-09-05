@@ -1,15 +1,9 @@
 """Regression tests for issue #28: a short write must not truncate a sent frame.
 
 Both ``SocketManager.send`` (socket_manager.py) and ``ClientSocketManager.send``
-(client_socket.py) call into the real ``bluetooth`` (PyBluez) package at import
-time. PyBluez is not installable in this environment (its setup script depends on
-the removed ``use_2to3`` distutils option) and is not required by the repository's
-other unit tests either -- ``bluetooth_service.client``/``server`` already import
-these two modules transitively, so the whole existing ``tests/`` suite already
-depends on PyBluez being importable. A minimal stub is installed into
-``sys.modules`` before the modules under test are imported, providing exactly the
-names each module imports from ``bluetooth`` and nothing else, so the fix itself
-is exercised unmodified.
+(client_socket.py) import the ``bluetooth`` (PyBluez) package. The focused tests
+use the real package when available and otherwise install a scoped fallback with
+the names required by the modules under test.
 """
 
 from __future__ import annotations
@@ -21,8 +15,6 @@ import pytest
 
 
 def _install_bluetooth_stub() -> None:
-    if "bluetooth" in sys.modules:
-        return
     stub = types.ModuleType("bluetooth")
     stub.BluetoothError = type("BluetoothError", (OSError,), {})
     stub.BluetoothSocket = object
@@ -35,12 +27,30 @@ def _install_bluetooth_stub() -> None:
     sys.modules["bluetooth"] = stub
 
 
-_install_bluetooth_stub()
+@pytest.fixture(scope="module")
+def manager_types():
+    modules_before = set(sys.modules)
+    using_stub = False
+    try:
+        import bluetooth  # noqa: F401
+    except ModuleNotFoundError as exc:
+        if exc.name != "bluetooth":
+            raise
+        _install_bluetooth_stub()
+        using_stub = True
 
-from bluetooth_service.client_config import ClientSettings  # noqa: E402
-from bluetooth_service.client_socket import ClientSocketManager  # noqa: E402
-from bluetooth_service.exceptions import BluetoothServerError  # noqa: E402
-from bluetooth_service.socket_manager import SocketManager  # noqa: E402
+    try:
+        from bluetooth_service.client_config import ClientSettings
+        from bluetooth_service.client_socket import ClientSocketManager
+        from bluetooth_service.exceptions import BluetoothServerError
+        from bluetooth_service.socket_manager import SocketManager
+
+        yield ClientSettings, ClientSocketManager, BluetoothServerError, SocketManager
+    finally:
+        if using_stub:
+            for module_name in set(sys.modules) - modules_before:
+                if module_name == "bluetooth" or module_name.startswith("bluetooth_service"):
+                    sys.modules.pop(module_name, None)
 
 
 class ShortWriteSocket:
@@ -85,7 +95,8 @@ class RaisingSocket:
 PAYLOAD = b"a payload longer than one short-write chunk"
 
 
-def test_socket_manager_send_delivers_full_payload_through_a_short_writer() -> None:
+def test_socket_manager_send_delivers_full_payload_through_a_short_writer(manager_types) -> None:
+    _, _, _, SocketManager = manager_types
     manager = SocketManager()
     fake_socket = ShortWriteSocket(chunk_size=4)
     manager._client_socket = fake_socket  # noqa: SLF001 - direct fixture wiring, no live connect available
@@ -95,7 +106,8 @@ def test_socket_manager_send_delivers_full_payload_through_a_short_writer() -> N
     assert bytes(fake_socket.sent) == PAYLOAD
 
 
-def test_socket_manager_send_wraps_failure_and_keeps_the_cause() -> None:
+def test_socket_manager_send_wraps_failure_and_keeps_the_cause(manager_types) -> None:
+    _, _, BluetoothServerError, SocketManager = manager_types
     manager = SocketManager()
     original = OSError("connection reset by peer")
     manager._client_socket = RaisingSocket(original)  # noqa: SLF001
@@ -106,7 +118,8 @@ def test_socket_manager_send_wraps_failure_and_keeps_the_cause() -> None:
     assert exc_info.value.__cause__ is original
 
 
-def test_client_socket_manager_send_delivers_full_payload_through_a_short_writer() -> None:
+def test_client_socket_manager_send_delivers_full_payload_through_a_short_writer(manager_types) -> None:
+    ClientSettings, ClientSocketManager, _, _ = manager_types
     client = ClientSocketManager(ClientSettings())
     fake_socket = ShortWriteSocket(chunk_size=4)
     client._socket = fake_socket  # noqa: SLF001 - direct fixture wiring, no live connect available
@@ -116,7 +129,8 @@ def test_client_socket_manager_send_delivers_full_payload_through_a_short_writer
     assert bytes(fake_socket.sent) == PAYLOAD
 
 
-def test_client_socket_manager_send_wraps_failure_and_keeps_the_cause() -> None:
+def test_client_socket_manager_send_wraps_failure_and_keeps_the_cause(manager_types) -> None:
+    ClientSettings, ClientSocketManager, BluetoothServerError, _ = manager_types
     client = ClientSocketManager(ClientSettings())
     original = OSError("connection reset by peer")
     client._socket = RaisingSocket(original)  # noqa: SLF001
