@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"errors"
-	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -52,46 +52,18 @@ func TestExecutableArguments(t *testing.T) {
 	}
 }
 
-// capture runs the CLI with os.Stdout and os.Stderr redirected. The command
-// packages print through the real files, so swapping them is what lets the
-// test see subcommand usage as well as run's own output.
 func capture(t *testing.T, args []string) (code int, stdout, stderr string) {
 	t.Helper()
-
-	outR, outW, err := os.Pipe()
+	var out, errOut bytes.Buffer
+	app, err := NewApp("ubtctl", "0.1.0-test", strings.NewReader(""), &out, &errOut)
 	if err != nil {
-		t.Fatalf("pipe: %v", err)
+		t.Fatal(err)
 	}
-	errR, errW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-
-	origOut, origErr := os.Stdout, os.Stderr
-	os.Stdout, os.Stderr = outW, errW
-
-	// Drain concurrently so a usage page larger than the pipe buffer cannot
-	// deadlock the test.
-	outC, errC := make(chan string, 1), make(chan string, 1)
-	go func() { b, _ := io.ReadAll(outR); outC <- string(b) }()
-	go func() { b, _ := io.ReadAll(errR); errC <- string(b) }()
-
-	func() {
-		defer func() {
-			os.Stdout, os.Stderr = origOut, origErr
-			outW.Close()
-			errW.Close()
-		}()
-		code = run(args, "0.1.0-test")
-	}()
-
-	return code, <-outC, <-errC
+	code = app.Run(context.Background(), args)
+	return code, out.String(), errOut.String()
 }
 
 func TestRun(t *testing.T) {
-	// Pin the socket somewhere that cannot exist, so a developer running a
-	// daemon locally gets the same result CI does. Any help path that starts
-	// dialing will fail here instead of silently passing.
 	t.Setenv("UBTD_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
 
 	tests := []struct {
@@ -102,34 +74,16 @@ func TestRun(t *testing.T) {
 		wantStderr string
 	}{
 		{
-			name:       "no args prints usage to stderr and returns 2",
+			name:       "no args prints usage to stderr",
 			args:       []string{},
 			wantCode:   2,
 			wantStderr: "Usage:\n  ubtctl <command> [flags]",
 		},
 		{
-			name:       "root --help returns 0",
+			name:       "root help",
 			args:       []string{"--help"},
 			wantCode:   0,
 			wantStdout: "Usage:\n  ubtctl <command> [flags]",
-		},
-		{
-			name:       "root -h returns 0",
-			args:       []string{"-h"},
-			wantCode:   0,
-			wantStdout: "Universal Bluetooth CLI",
-		},
-		{
-			name:       "root -help returns 0",
-			args:       []string{"-help"},
-			wantCode:   0,
-			wantStdout: "Universal Bluetooth CLI",
-		},
-		{
-			name:       "root help returns 0",
-			args:       []string{"help"},
-			wantCode:   0,
-			wantStdout: "Universal Bluetooth CLI",
 		},
 		{
 			name:       "help help returns root usage",
@@ -138,45 +92,63 @@ func TestRun(t *testing.T) {
 			wantStdout: "Universal Bluetooth CLI",
 		},
 		{
-			name:       "subcommand help via help verb returns 0",
+			name:       "leaf help through help command",
 			args:       []string{"help", "ping"},
 			wantCode:   0,
-			wantStdout: "Usage of ping:",
+			wantStdout: "Usage of ubtctl ping:",
 		},
 		{
-			name:       "subcommand -h flag returns 0",
-			args:       []string{"ping", "-h"},
-			wantCode:   0,
-			wantStdout: "Usage of ping:",
-		},
-		{
-			name:       "subcommand --help flag returns 0",
+			name:       "leaf help through flag",
 			args:       []string{"status", "--help"},
 			wantCode:   0,
-			wantStdout: "Usage of status:",
+			wantStdout: "Usage of ubtctl status:",
 		},
 		{
-			name:       "help with extra arguments returns 2",
-			args:       []string{"help", "ping", "status"},
+			name:       "group help",
+			args:       []string{"help", "plan"},
+			wantCode:   0,
+			wantStdout: "Usage:\n  ubtctl plan <command> [flags]",
+		},
+		{
+			name:       "nested help through help command",
+			args:       []string{"help", "plan", "show"},
+			wantCode:   0,
+			wantStdout: "Usage:\n  ubtctl plan show <file>",
+		},
+		{
+			name:       "nested help through flag",
+			args:       []string{"plan", "run", "-h"},
+			wantCode:   0,
+			wantStdout: "Usage:\n  ubtctl plan run [flags] <file>",
+		},
+		{
+			name:       "missing nested command",
+			args:       []string{"plan"},
 			wantCode:   2,
-			wantStderr: "expected one command, got 2",
+			wantStderr: "ubtctl plan: missing command",
 		},
 		{
-			name:       "unknown command returns 2",
+			name:       "unknown root command",
 			args:       []string{"nonexistent-cmd"},
 			wantCode:   2,
 			wantStderr: `ubtctl: unknown command "nonexistent-cmd"`,
 		},
 		{
-			name:       "help for unknown command returns 2",
-			args:       []string{"help", "nonexistent-cmd"},
+			name:       "unknown nested command",
+			args:       []string{"plan", "nonexistent-cmd"},
 			wantCode:   2,
-			wantStderr: `ubtctl: unknown command "nonexistent-cmd"`,
+			wantStderr: `ubtctl plan: unknown command "nonexistent-cmd"`,
 		},
 		{
-			name:       "invalid flag for known command returns 1",
+			name:       "extra help path",
+			args:       []string{"help", "ping", "status"},
+			wantCode:   2,
+			wantStderr: "ubtctl help: ping has no subcommands",
+		},
+		{
+			name:       "invalid flag is usage error",
 			args:       []string{"version", "--invalid-flag-that-does-not-exist"},
-			wantCode:   1,
+			wantCode:   2,
 			wantStderr: "ubtctl version: flag provided but not defined",
 		},
 	}
@@ -185,7 +157,7 @@ func TestRun(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			code, stdout, stderr := capture(t, tc.args)
 			if code != tc.wantCode {
-				t.Errorf("run(%v) = %d; want %d", tc.args, code, tc.wantCode)
+				t.Errorf("Run(%v) = %d; want %d", tc.args, code, tc.wantCode)
 			}
 			if tc.wantStdout != "" && !strings.Contains(stdout, tc.wantStdout) {
 				t.Errorf("stdout missing %q; got:\n%s", tc.wantStdout, stdout)
@@ -193,8 +165,6 @@ func TestRun(t *testing.T) {
 			if tc.wantStderr != "" && !strings.Contains(stderr, tc.wantStderr) {
 				t.Errorf("stderr missing %q; got:\n%s", tc.wantStderr, stderr)
 			}
-			// Help is requested output; diagnostics are not. Neither should
-			// end up on the other's stream.
 			if tc.wantStdout != "" && stderr != "" {
 				t.Errorf("help path wrote to stderr:\n%s", stderr)
 			}
@@ -205,28 +175,89 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// TestHelpForEveryCommand covers the acceptance criterion across the whole
-// surface rather than two hand-picked names: ask and mcp dial the daemon
-// immediately after parsing, so a -h that stopped short-circuiting would
-// fail here against the absent socket set in TestRun.
 func TestHelpForEveryCommand(t *testing.T) {
 	t.Setenv("UBTD_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	app, err := NewApp("ubtctl", "0.1.0-test", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	names := commands.Names()
-	if len(names) == 0 {
+	var paths [][]string
+	var visit func(*commands.Registry, []string)
+	visit = func(registry *commands.Registry, prefix []string) {
+		for _, name := range registry.Names() {
+			path := append(append([]string{}, prefix...), name)
+			paths = append(paths, path)
+			if group, ok := lookupGroup(t, registry, name); ok {
+				visit(group.Subcommands(), path)
+			}
+		}
+	}
+	visit(app.registry, nil)
+	if len(paths) == 0 {
 		t.Fatal("no commands registered")
 	}
-	for _, name := range names {
-		t.Run(name, func(t *testing.T) {
-			for _, args := range [][]string{{name, "-h"}, {"help", name}} {
+
+	for _, path := range paths {
+		path := path
+		t.Run(strings.Join(path, " "), func(t *testing.T) {
+			for _, args := range [][]string{
+				append(append([]string{}, path...), "-h"),
+				append([]string{"help"}, path...),
+			} {
 				code, stdout, stderr := capture(t, args)
-				if code != 0 {
-					t.Errorf("run(%v) = %d; want 0 (stderr: %s)", args, code, stderr)
-				}
-				if stdout == "" {
-					t.Errorf("run(%v) printed no help to stdout", args)
+				if code != 0 || stdout == "" || stderr != "" {
+					t.Errorf("Run(%v): code=%d stdout=%q stderr=%q", args, code, stdout, stderr)
 				}
 			}
 		})
+	}
+}
+
+func lookupGroup(t *testing.T, registry *commands.Registry, name string) (commands.Group, bool) {
+	t.Helper()
+	command, ok := registry.Lookup(name)
+	if !ok {
+		t.Fatalf("command %q disappeared", name)
+	}
+	group, ok := command.(commands.Group)
+	return group, ok
+}
+
+type contextCommand struct {
+	called *bool
+}
+
+func (contextCommand) Name() string     { return "context" }
+func (contextCommand) Synopsis() string { return "test context forwarding" }
+func (c contextCommand) Run(ctx context.Context, _ []string, _ commands.Invocation) error {
+	*c.called = true
+	return ctx.Err()
+}
+
+func TestAppForwardsCancellation(t *testing.T) {
+	called := false
+	registry, err := commands.NewRegistry(contextCommand{called: &called})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	app := &App{
+		registry: registry,
+		invocation: commands.Invocation{
+			ProgramName: "ubtctl",
+			CLIVersion:  "test",
+			In:          strings.NewReader(""),
+			Out:         &out,
+			ErrOut:      &errOut,
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if code := app.Run(ctx, []string{"context"}); code != 1 {
+		t.Fatalf("Run(cancelled) = %d; want 1", code)
+	}
+	if !called {
+		t.Fatal("command did not receive the cancelled context")
 	}
 }

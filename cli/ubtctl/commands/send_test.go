@@ -94,7 +94,7 @@ func TestReadPayload(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := readPayload(tc.file, tc.inline, tc.fileSet, tc.dataSet)
+			got, err := readPayload(bytes.NewReader(nil), tc.file, tc.inline, tc.fileSet, tc.dataSet)
 			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error %q, got nil (payload=%q)", tc.wantErr, got)
@@ -151,7 +151,7 @@ func TestReadPayloadFlagVisit(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			file, data, fileSet, dataSet := parse(t, tc.args...)
-			got, err := readPayload(file, data, fileSet, dataSet)
+			got, err := readPayload(bytes.NewReader(nil), file, data, fileSet, dataSet)
 			if tc.wantErr != "" {
 				if err == nil || err.Error() != tc.wantErr {
 					t.Fatalf("err=%v; want %q", err, tc.wantErr)
@@ -173,7 +173,7 @@ func TestReadPayloadFlagVisit(t *testing.T) {
 			t.Fatal(err)
 		}
 		file, data, fileSet, dataSet := parse(t, "--file", path)
-		got, err := readPayload(file, data, fileSet, dataSet)
+		got, err := readPayload(bytes.NewReader(nil), file, data, fileSet, dataSet)
 		if err != nil {
 			t.Fatal(err)
 		}

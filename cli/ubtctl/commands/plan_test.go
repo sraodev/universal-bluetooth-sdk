@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,11 +16,33 @@ func TestPlanDryRunWithoutDaemon(t *testing.T) {
 	if err := os.WriteFile(plan, []byte(`{"steps":[{"tool":"send_payload","arguments":{"address":"AA:BB:CC:DD:EE:01","payload":"hi"}}]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := planRun([]string{"--socket", filepath.Join(dir, "missing.sock"), "--dry-run", plan}); err != nil {
+	invocation := testInvocation(&bytes.Buffer{})
+	command := planRunCmd{}
+	if err := command.Run(context.Background(), []string{"--socket", filepath.Join(dir, "missing.sock"), "--dry-run", plan}, invocation); err != nil {
 		t.Fatal(err)
 	}
-	if err := planRun([]string{plan, "--yes"}); err == nil {
+	if err := command.Run(context.Background(), []string{plan, "--yes"}, invocation); err == nil {
 		t.Fatal("flags after path must not be silently ignored")
+	}
+}
+
+func TestReadPayloadUsesInvocationInput(t *testing.T) {
+	got, err := readPayload(strings.NewReader("from stdin"), "-", "", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "from stdin" {
+		t.Fatalf("readPayload() = %q; want %q", got, "from stdin")
+	}
+}
+
+func testInvocation(out *bytes.Buffer) Invocation {
+	return Invocation{
+		ProgramName: "ubtctl",
+		CLIVersion:  "test",
+		In:          strings.NewReader(""),
+		Out:         out,
+		ErrOut:      &bytes.Buffer{},
 	}
 }
 

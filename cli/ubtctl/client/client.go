@@ -19,8 +19,9 @@ type Client struct {
 	mu   sync.Mutex // serialises writes; reads happen on the caller goroutine
 }
 
-func Dial(socketPath string) (*Client, error) {
-	c, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+func Dial(ctx context.Context, socketPath string) (*Client, error) {
+	dialer := net.Dialer{Timeout: 2 * time.Second}
+	c, err := dialer.DialContext(ctx, "unix", socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("dial %s: %w", socketPath, err)
 	}

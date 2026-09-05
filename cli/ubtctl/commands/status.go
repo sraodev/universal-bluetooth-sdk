@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -13,15 +14,15 @@ type statusCmd struct{}
 func (statusCmd) Name() string     { return "status" }
 func (statusCmd) Synopsis() string { return "show daemon health and registered drivers" }
 
-func (statusCmd) Run(args []string, _ RootInfo) error {
-	fs := newFlagSet("status")
+func (statusCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "status")
 	var b baseFlags
 	bindBase(fs, &b)
-	if err := parseFlags(fs, args); err != nil {
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
 		return err
 	}
 
-	c, ctx, cancel, err := dial(b)
+	c, ctx, cancel, err := dial(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -36,10 +37,8 @@ func (statusCmd) Run(args []string, _ RootInfo) error {
 	if err := client.Decode(res, &s); err != nil {
 		return err
 	}
-	fmt.Printf("state:    %s\n", s.State)
-	fmt.Printf("sessions: %d\n", s.ActiveSessions)
-	fmt.Printf("drivers:  %s\n", strings.Join(s.Drivers, ", "))
+	fmt.Fprintf(invocation.Out, "state:    %s\n", s.State)
+	fmt.Fprintf(invocation.Out, "sessions: %d\n", s.ActiveSessions)
+	fmt.Fprintf(invocation.Out, "drivers:  %s\n", strings.Join(s.Drivers, ", "))
 	return nil
 }
-
-func init() { register(statusCmd{}) }

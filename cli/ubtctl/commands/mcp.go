@@ -3,9 +3,6 @@ package commands
 import (
 	"context"
 	"log/slog"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/ai"
 	"github.com/sraodev/bluetooth-service-rfcomm-python/cli/ubtctl/client"
@@ -19,17 +16,17 @@ func (mcpCmd) Synopsis() string {
 	return "serve the ubtctl tool registry over MCP on stdio (for editors and agents)"
 }
 
-func (mcpCmd) Run(args []string, info RootInfo) error {
-	fs := newFlagSet("mcp")
+func (mcpCmd) Run(ctx context.Context, args []string, invocation Invocation) error {
+	fs := newFlagSet(invocation, "mcp")
 	socket := fs.String("socket", defaultSocket(), "ubtd socket path")
-	if err := parseFlags(fs, args); err != nil {
+	if err := parseFlags(fs, args, invocation.Out); err != nil {
 		return err
 	}
 
 	// Stdio is reserved for the JSON-RPC stream; logs go to stderr only.
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log := slog.New(slog.NewTextHandler(invocation.ErrOut, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	c, err := client.Dial(*socket)
+	c, err := client.Dial(ctx, *socket)
 	if err != nil {
 		return err
 	}
@@ -37,16 +34,11 @@ func (mcpCmd) Run(args []string, info RootInfo) error {
 
 	registry := ai.BuildSpecs(c, false)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	srv := mcp.New(registry, "ubtctl", info.CLIVersion, log)
+	srv := mcp.New(registry, invocation.ProgramName, invocation.CLIVersion, log)
 	log.Info("ubtctl mcp serving on stdio",
 		"socket", *socket,
 		"tools", len(registry.All()),
 		"protocol", mcp.ProtocolVersion,
 	)
-	return srv.Serve(ctx, os.Stdin, os.Stdout)
+	return srv.Serve(ctx, invocation.In, invocation.Out)
 }
-
-func init() { register(mcpCmd{}) }
