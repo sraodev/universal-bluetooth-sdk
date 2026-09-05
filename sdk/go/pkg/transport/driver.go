@@ -8,6 +8,7 @@ package transport
 
 import (
 	"context"
+	"sort"
 
 	"github.com/sraodev/bluetooth-service-rfcomm-python/sdk/go/pkg/protocol"
 )
@@ -54,18 +55,21 @@ func (r *Registry) ForTransport(t string) (Driver, bool) {
 	return d, ok
 }
 
+// Names returns registered driver names in ascending lexical order.
 func (r *Registry) Names() []string {
 	out := make([]string, 0, len(r.byName))
 	for n := range r.byName {
 		out = append(out, n)
 	}
+	sort.Strings(out)
 	return out
 }
 
+// Capabilities returns capabilities ordered by ascending driver name.
 func (r *Registry) Capabilities() []protocol.Capability {
 	out := make([]protocol.Capability, 0, len(r.byName))
-	for _, d := range r.byName {
-		out = append(out, d.Capability())
+	for _, name := range r.Names() {
+		out = append(out, r.byName[name].Capability())
 	}
 	return out
 }
