@@ -1,0 +1,39 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","primaryColor":"#E8F0FE","primaryTextColor":"#172B4D","primaryBorderColor":"#1A73E8","lineColor":"#5F6368","secondaryColor":"#E6F4EA","tertiaryColor":"#FEF7E0"},"flowchart":{"curve":"basis","htmlLabels":true}}}%%
+flowchart TB
+    U[User<br/>latest · exact version · dry-run] --> P[POSIX installer<br/>strict argument + platform selection]
+
+    subgraph Network[Fixed network trust boundary]
+        C[curl config disabled<br/>HTTPS-only redirects · TLS 1.2+]
+        R[GitHub Release assets<br/>archive + checksums.txt]
+        C --> R
+    end
+
+    P --> C
+
+    subgraph Validation[No target mutation]
+        H[SHA-256 match]
+        A[Exact 5-member archive]
+        B[ubt + ubtctl versions agree<br/>ubtd help succeeds]
+        H --> A --> B
+    end
+
+    R --> H
+
+    subgraph Transaction[Target-filesystem transaction]
+        N[Copy verified new set]
+        O[Back up existing paths]
+        X[Replace all 3 executables]
+        Q{Replacement complete?}
+        K[Keep new matching set]
+        Z[Restore prior set]
+        N --> O --> X --> Q
+        Q -->|Yes| K
+        Q -->|No| Z
+    end
+
+    B --> N
+
+    F[Future distribution<br/>stable URL #44 · mise #42 · Homebrew #43]:::future
+    R -. separate reviewed gates .-> F
+
+    classDef future fill:#FCE8E6,stroke:#D93025,color:#7A1B16,stroke-width:1.5px;

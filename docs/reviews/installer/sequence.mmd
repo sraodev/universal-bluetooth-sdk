@@ -1,0 +1,32 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","primaryColor":"#E8F0FE","primaryTextColor":"#172B4D","primaryBorderColor":"#1A73E8","lineColor":"#5F6368","actorBkg":"#E8F0FE","actorBorder":"#1A73E8","actorTextColor":"#172B4D","signalColor":"#3C4043","signalTextColor":"#202124","noteBkgColor":"#FEF7E0","noteBorderColor":"#F9AB00"}}}%%
+sequenceDiagram
+    autonumber
+    actor User
+    participant Installer
+    participant GitHub as GitHub Releases
+    participant Stage as Verified staging
+    participant Target as Install directory
+
+    User->>Installer: Run with latest or exact version
+    Installer->>Installer: Validate flags, OS, architecture, tag
+    alt Dry run
+        Installer-->>User: Print URLs and destination
+    else Install
+        Installer->>GitHub: HTTPS-only archive download
+        Installer->>GitHub: HTTPS-only checksums download
+        Installer->>Installer: Verify SHA-256 and exact members
+        Installer->>Stage: Extract and execute 3 binary checks
+        alt Validation fails
+            Installer-->>User: Fail before target mutation
+        else Validation passes
+            Installer->>Target: Stage new binaries on target filesystem
+            Installer->>Target: Back up existing ubt, ubtctl, ubtd
+            Installer->>Target: Replace all three binaries
+            alt Replacement fails
+                Installer->>Target: Remove partial new set and restore backups
+                Installer-->>User: Report failure
+            else Replacement succeeds
+                Installer-->>User: Report install directory
+            end
+        end
+    end
