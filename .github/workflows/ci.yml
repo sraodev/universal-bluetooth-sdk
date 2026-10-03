@@ -25,9 +25,15 @@ jobs:
       - run: go build -o bin/ubtd ./cli/ubtd
       - run: go build -o bin/ubt ./cli/ubtctl
       - run: go build -o bin/ubtctl ./cli/ubtctl
+      - name: Installer syntax
+        run: sh -n scripts/install.sh && bash -n scripts/install.sh
+      - name: ShellCheck installer
+        if: runner.os == 'Linux'
+        run: shellcheck scripts/install.sh
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+      - run: python3 -m unittest scripts/test_install.py -v
       - run: python3 scripts/smoke.py
       - run: python3 -m unittest discover -s examples/chat -p 'test_*.py' -v
   release-snapshot:

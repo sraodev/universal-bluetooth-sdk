@@ -22,7 +22,9 @@ class ServerSettings:
     # Acknowledgement / retry protocol messages
     resend_empty_message: str = "EmptyBufferResend"
     resend_corrupt_message: str = "CorruptedBufferResend"
+    delimiter_missing_message: str = "DelimiterMissingBufferResend"
     acknowledge_message: str = "DataReceived"
+    max_resend_attempts: int = 3
 
     # Timeouts (seconds). None means blocking behaviour.
     accept_timeout: Optional[float] = None
@@ -34,4 +36,3 @@ class ServerSettings:
 
     # For future extension (correlation IDs, tenant IDs, etc.)
     extra_metadata: dict[str, str] = field(default_factory=dict)
-

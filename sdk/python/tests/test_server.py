@@ -8,6 +8,7 @@ from typing import Any, List, Optional, Tuple
 import pytest
 
 from bluetooth_service.config import ServerSettings
+from bluetooth_service.exceptions import BluetoothServerError
 from bluetooth_service.server import BluetoothServer
 
 
@@ -114,3 +115,72 @@ def test_server_requests_retry_on_corrupt_payload() -> None:
     assert socket_manager.sent_messages[-1] == b"DataReceived"
     assert sink.persisted == [{"message": "data"}]
 
+
+@pytest.mark.parametrize(
+    "malformed_frame",
+    [
+        b"no-delimiter-here",
+        b":data",
+        b"abc:data",
+        b"-1:data",
+    ],
+)
+def test_server_requests_resend_on_invalid_length_prefix(
+    malformed_frame: bytes,
+) -> None:
+    socket_manager = StubSocketManager(
+        payloads=[
+            malformed_frame,
+            b"4:data",
+        ]
+    )
+    sink = StubSink()
+    server = BluetoothServer(
+        ServerSettings(),
+        deserializer=StubDeserializer(output={"message": "data"}),
+        sink=sink,
+        socket_manager=socket_manager,
+    )
+
+    server.start()
+    result = server.receive_once()
+    server.stop()
+
+    assert socket_manager.sent_messages == [
+        b"DelimiterMissingBufferResend",
+        b"DataReceived",
+    ]
+    assert sink.persisted == [{"message": "data"}]
+    assert result == {"message": "data"}
+
+
+def test_server_stops_after_bounded_resend_attempts() -> None:
+    # A fragmented/desynchronized stream must fail loudly instead of retrying
+    # forever and emitting an unbounded number of control messages.
+    socket_manager = StubSocketManager(
+        payloads=[
+            b"800:" + (b"x" * 664),
+            b"x" * 136,
+            b"x" * 136,
+            b"x" * 136,
+        ]
+    )
+    sink = StubSink()
+    server = BluetoothServer(
+        ServerSettings(max_resend_attempts=3),
+        deserializer=StubDeserializer(output={"message": "data"}),
+        sink=sink,
+        socket_manager=socket_manager,
+    )
+
+    server.start()
+    with pytest.raises(BluetoothServerError, match="after 3 resend attempts"):
+        server.receive_once()
+    server.stop()
+
+    assert socket_manager.sent_messages == [
+        b"CorruptedBufferResend",
+        b"DelimiterMissingBufferResend",
+        b"DelimiterMissingBufferResend",
+    ]
+    assert sink.persisted == []

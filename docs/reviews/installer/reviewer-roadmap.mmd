@@ -1,0 +1,15 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","primaryColor":"#E8F0FE","primaryTextColor":"#172B4D","primaryBorderColor":"#1A73E8","lineColor":"#5F6368","secondaryColor":"#E6F4EA","tertiaryColor":"#FEF7E0"},"flowchart":{"curve":"basis","htmlLabels":true}}}%%
+flowchart TB
+    S([Start with scope]) --> I[1. Installer trust chain<br/>scripts/install.sh]
+    I --> T[2. Offline behavior and faults<br/>scripts/test_install.py]
+    T --> C[3. Linux + macOS CI<br/>syntax · ShellCheck · behavior]
+    C --> E{Evidence complete?}
+    E -->|Yes| D[Review diagrams<br/>and rollout gates]
+    D --> M([Merge decision])
+    E -->|No| F[Request focused fix]
+    F --> I
+
+    X[Out of scope<br/>release publication · stable URL<br/>mise · Homebrew · signing · Windows]:::excluded
+    S -. keep separate .-> X
+
+    classDef excluded fill:#FCE8E6,stroke:#D93025,color:#7A1B16,stroke-width:2px;

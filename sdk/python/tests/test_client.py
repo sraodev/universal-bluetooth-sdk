@@ -70,7 +70,7 @@ def test_client_sends_payload_and_receives_ack() -> None:
     client.stop()
 
     assert socket_manager.discovered and socket_manager.connected
-    assert socket_manager.sent_payloads[0] == b"14:payload-bytes"
+    assert socket_manager.sent_payloads[0] == b"13:payload-bytes"
     assert serializer.called_with == {"message": "hi"}
     assert result == {"message": "hi"}
     assert socket_manager.closed
@@ -99,3 +99,25 @@ def test_client_retries_when_server_requests_resend() -> None:
     # Expect two sends due to retry.
     assert socket_manager.sent_payloads == [b"3:abc", b"3:abc"]
 
+
+def test_client_retries_when_server_reports_missing_delimiter() -> None:
+    serializer = StubSerializer(payload=b"abc")
+    source = StubDataSource({"message": "retry"})
+    socket_manager = StubClientSocketManager(
+        responses=[
+            b"DelimiterMissingBufferResend",
+            b"DataReceived",
+        ]
+    )
+    client = BluetoothClient(
+        ClientSettings(),
+        serializer=serializer,
+        source=source,
+        socket_manager=socket_manager,
+    )
+
+    client.start()
+    client.send_once()
+    client.stop()
+
+    assert socket_manager.sent_payloads == [b"3:abc", b"3:abc"]
