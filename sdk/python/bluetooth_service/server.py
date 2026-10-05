@@ -115,13 +115,36 @@ class BluetoothServer:
                 continue
             data_size = int(data_size_str)
 
-            if len(remainder) < data_size:
+            payload = self._read_remaining(remainder, data_size)
+            if len(payload) < data_size:
                 request_resend(
-                    self.settings.resend_corrupt_message,
-                    "Corrupted buffer detected",
+                    self.settings.resend_incomplete_message,
+                    f"Incomplete buffer: got {len(payload)} of {data_size} bytes",
                 )
                 continue
 
             self._socket_manager.send(self.settings.acknowledge_message)
             logger.debug("Payload of %s bytes acknowledged", data_size)
-            return remainder[:data_size]
+            return payload[:data_size]
+
+    def _read_remaining(self, received: bytes, data_size: int) -> bytes:
+        """Keep reading until ``data_size`` payload bytes arrived or the peer stops.
+
+        A frame larger than one ``recv`` arrives in several chunks, so the first
+        short read is not an error. Never asks for more than the bytes still
+        missing, so bytes after the frame stay unread on the socket.
+        """
+        buffer = received
+        while len(buffer) < data_size:
+            try:
+                chunk = self._socket_manager.receive(
+                    min(self.settings.buffer_size, data_size - len(buffer)),
+                    timeout=self.settings.receive_timeout,
+                )
+            except BluetoothServerError as exc:
+                logger.warning("Stopped reading mid-frame: %s", exc)
+                break
+            if not chunk:
+                break
+            buffer += chunk
+        return buffer
