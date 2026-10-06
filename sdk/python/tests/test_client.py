@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
+import pytest
+
 from bluetooth_service.client import BluetoothClient
 from bluetooth_service.client_config import ClientSettings
+from bluetooth_service.exceptions import BluetoothServerError
 
 
 class StubSerializer:
@@ -121,3 +124,46 @@ def test_client_retries_when_server_reports_missing_delimiter() -> None:
     client.stop()
 
     assert socket_manager.sent_payloads == [b"3:abc", b"3:abc"]
+
+
+def test_client_retries_when_server_reports_incomplete_buffer() -> None:
+    serializer = StubSerializer(payload=b"abc")
+    source = StubDataSource({"message": "retry"})
+    socket_manager = StubClientSocketManager(
+        responses=[
+            b"IncompleteBufferResend",
+            b"DataReceived",
+        ]
+    )
+    client = BluetoothClient(
+        ClientSettings(),
+        serializer=serializer,
+        source=source,
+        socket_manager=socket_manager,
+    )
+
+    client.start()
+    client.send_once()
+    client.stop()
+
+    assert socket_manager.sent_payloads == [b"3:abc", b"3:abc"]
+
+
+def test_client_stops_after_bounded_resend_attempts() -> None:
+    serializer = StubSerializer(payload=b"abc")
+    source = StubDataSource({"message": "retry"})
+    socket_manager = StubClientSocketManager(responses=[b"IncompleteBufferResend"] * 4)
+    client = BluetoothClient(
+        ClientSettings(max_resend_attempts=3),
+        serializer=serializer,
+        source=source,
+        socket_manager=socket_manager,
+    )
+
+    client.start()
+    with pytest.raises(BluetoothServerError, match="after 3 attempts"):
+        client.send_once()
+    client.stop()
+
+    # The original send plus three retransmits, then it gives up.
+    assert socket_manager.sent_payloads == [b"3:abc"] * 4

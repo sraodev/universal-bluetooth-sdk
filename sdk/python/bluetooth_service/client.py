@@ -53,6 +53,7 @@ class BluetoothClient:
         return prefix + payload
 
     def _await_ack(self, payload: bytes) -> None:
+        resend_attempts = 0
         while True:
             response = self._socket_manager.receive(
                 self.settings.buffer_size,
@@ -61,8 +62,15 @@ class BluetoothClient:
             if response.decode("utf-8") in {
                 self.settings.resend_empty_message,
                 self.settings.resend_corrupt_message,
+                self.settings.resend_incomplete_message,
                 self.settings.delimiter_missing_message,
             }:
+                if resend_attempts >= self.settings.max_resend_attempts:
+                    raise BluetoothServerError(
+                        f"Server still requested a resend after "
+                        f"{self.settings.max_resend_attempts} attempts: {response!r}"
+                    )
+                resend_attempts += 1
                 logger.warning("Server requested retransmit: %s", response)
                 self._socket_manager.send(self._frame_payload(payload))
                 continue

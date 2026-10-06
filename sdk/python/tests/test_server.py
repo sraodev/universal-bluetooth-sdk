@@ -18,6 +18,7 @@ class StubSocketManager:
     def __init__(self, payloads: List[bytes]):
         self.payloads = payloads
         self.sent_messages: List[bytes] = []
+        self.receive_sizes: List[int] = []
         self.opened = False
         self.bound: Optional[Tuple[str, int, Optional[int]]] = None
         self.advertised: Optional[Tuple[str, str, bool]] = None
@@ -40,7 +41,11 @@ class StubSocketManager:
     def receive(self, buffer_size: int, timeout: Optional[float] = None) -> bytes:
         if not self.payloads:
             raise AssertionError("No payloads left to return")
-        return self.payloads.pop(0)
+        self.receive_sizes.append(buffer_size)
+        payload = self.payloads.pop(0)
+        if isinstance(payload, Exception):
+            raise payload
+        return payload
 
     def send(self, payload: bytes) -> None:
         self.sent_messages.append(payload if isinstance(payload, bytes) else payload.encode("utf-8"))
@@ -90,11 +95,13 @@ def test_server_receives_and_persists_payload() -> None:
     assert socket_manager.closed
 
 
-def test_server_requests_retry_on_corrupt_payload() -> None:
-    # First payload smaller than declared size -> should trigger resend request.
+def test_server_requests_retry_on_incomplete_payload() -> None:
+    # The peer stops (empty read) before the declared 10 bytes arrived ->
+    # should trigger a resend request that says the frame is incomplete.
     socket_manager = StubSocketManager(
         payloads=[
             b"10:short",
+            b"",
             b"4:data",
         ]
     )
@@ -111,7 +118,7 @@ def test_server_requests_retry_on_corrupt_payload() -> None:
     server.stop()
 
     # First send should be a resend request, second should be ack.
-    assert socket_manager.sent_messages[0] == b"CorruptedBufferResend"
+    assert socket_manager.sent_messages[0] == b"IncompleteBufferResend"
     assert socket_manager.sent_messages[-1] == b"DataReceived"
     assert sink.persisted == [{"message": "data"}]
 
@@ -155,14 +162,19 @@ def test_server_requests_resend_on_invalid_length_prefix(
 
 
 def test_server_stops_after_bounded_resend_attempts() -> None:
-    # A fragmented/desynchronized stream must fail loudly instead of retrying
-    # forever and emitting an unbounded number of control messages.
+    # A peer that keeps stopping mid-frame must fail loudly instead of
+    # retrying forever and emitting an unbounded number of control messages.
+    truncated_frame = b"800:" + (b"x" * 664)
     socket_manager = StubSocketManager(
         payloads=[
-            b"800:" + (b"x" * 664),
-            b"x" * 136,
-            b"x" * 136,
-            b"x" * 136,
+            truncated_frame,
+            b"",
+            truncated_frame,
+            b"",
+            truncated_frame,
+            b"",
+            truncated_frame,
+            b"",
         ]
     )
     sink = StubSink()
@@ -178,9 +190,77 @@ def test_server_stops_after_bounded_resend_attempts() -> None:
         server.receive_once()
     server.stop()
 
-    assert socket_manager.sent_messages == [
-        b"CorruptedBufferResend",
-        b"DelimiterMissingBufferResend",
-        b"DelimiterMissingBufferResend",
-    ]
+    assert socket_manager.sent_messages == [b"IncompleteBufferResend"] * 3
     assert sink.persisted == []
+
+
+def test_server_receives_payload_larger_than_buffer_size() -> None:
+    body = bytes(range(256)) * 20  # 5120 bytes, five times the default buffer
+    frame = f"{len(body)}:".encode() + body
+    first_read = frame[:1024]
+    rest = frame[1024:]
+    socket_manager = StubSocketManager(
+        payloads=[first_read] + [rest[i : i + 1024] for i in range(0, len(rest), 1024)]
+    )
+    received: List[bytes] = []
+
+    class RecordingDeserializer:
+        def deserialize(self, payload: bytes) -> Any:
+            received.append(payload)
+            return {"size": len(payload)}
+
+    server = BluetoothServer(
+        ServerSettings(),
+        deserializer=RecordingDeserializer(),
+        sink=StubSink(),
+        socket_manager=socket_manager,
+    )
+
+    server.start()
+    result = server.receive_once()
+    server.stop()
+
+    assert received == [body]
+    assert result == {"size": len(body)}
+    assert socket_manager.sent_messages == [b"DataReceived"]
+
+
+def test_server_does_not_read_past_the_end_of_the_frame() -> None:
+    # 10 payload bytes: 4 arrive with the prefix, so only 6 may be requested next.
+    socket_manager = StubSocketManager(payloads=[b"10:abcd", b"efghij"])
+    server = BluetoothServer(
+        ServerSettings(),
+        deserializer=StubDeserializer(output={"message": "data"}),
+        sink=StubSink(),
+        socket_manager=socket_manager,
+    )
+
+    server.start()
+    server.receive_once()
+    server.stop()
+
+    assert socket_manager.receive_sizes == [1024, 6]
+
+
+def test_server_requests_resend_when_read_fails_mid_frame() -> None:
+    socket_manager = StubSocketManager(
+        payloads=[
+            b"10:short",
+            BluetoothServerError("Unable to receive data"),
+            b"4:data",
+        ]
+    )
+    sink = StubSink()
+    server = BluetoothServer(
+        ServerSettings(),
+        deserializer=StubDeserializer(output={"message": "data"}),
+        sink=sink,
+        socket_manager=socket_manager,
+    )
+
+    server.start()
+    server.receive_once()
+    server.stop()
+
+    assert socket_manager.sent_messages == [b"IncompleteBufferResend", b"DataReceived"]
+    assert sink.persisted == [{"message": "data"}]

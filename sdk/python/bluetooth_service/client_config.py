@@ -22,8 +22,10 @@ class ClientSettings:
     connect_backoff_seconds: float = 1.0
     resend_empty_message: str = "EmptyBufferResend"
     resend_corrupt_message: str = "CorruptedBufferResend"
+    resend_incomplete_message: str = "IncompleteBufferResend"
     delimiter_missing_message: str = "DelimiterMissingBufferResend"
     acknowledge_message: str = "DataReceived"
+    max_resend_attempts: int = 3
     connect_timeout: Optional[float] = None
     receive_timeout: Optional[float] = None
     logging_config_path: str = "configLogger.json"
